@@ -1,5 +1,6 @@
 import pathlib
-rootdir = pathlib.Path(__file__).parent.parent.parent.parent.parent
+import qem_practical
+rootdir = pathlib.Path(qem_practical.__file__).parent.parent.parent
 import subprocess
 
 
@@ -14,7 +15,7 @@ def update():
 
     output = subprocess.check_output(
         ['uv', 'pip', "install", "-e", "."],
-        cwd=rootdir / "practical",
+        cwd=rootdir,
         shell=True,
     )
     print(output.decode('utf-8'))
