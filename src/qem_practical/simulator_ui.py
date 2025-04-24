@@ -38,7 +38,7 @@ def update_cal_axes(fig, extent):
 
 def simulator_ui(simulator: STEMImageSimulator):
     survey_dwell_time = 0.000_001
-    survey = simulator.survey_image(survey_dwell_time)
+    survey = simulator.survey_image(survey_dwell_time, progress=False).data
     survey_fig = (
         ApertureFigure
         .new(
@@ -98,7 +98,7 @@ def simulator_ui(simulator: STEMImageSimulator):
     def update_survey(*e):
         try:
             survey_spinner.value = True
-            survey = simulator.survey_image(survey_dwell_time, progress=False)
+            survey = simulator.survey_image(survey_dwell_time, progress=False).data
             survey_fig.update(
                 survey.astype(np.float32)
             )
@@ -182,7 +182,7 @@ def simulator_ui(simulator: STEMImageSimulator):
         scan_img = simulator.scan(
             YX(cy, cx), scan_shape, scan_step, dwell_time,
             rotation=0, progress=False,
-        )
+        ).data
 
         update_cal_axes(scan_fig.fig, extent)
         set_frame_height(scan_fig.fig, scan_img.shape, maxdim=MAXDIM)

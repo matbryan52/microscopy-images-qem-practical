@@ -7,8 +7,14 @@ import tqdm.auto as tqdm
 import pandas as pd
 from typing import NamedTuple, TypeAlias, Self, Literal
 from scipy.interpolate import RegularGridInterpolator
+import pint
+import hyperspy.api as hs
+from hyperspy._signals.signal2d import Signal2D
+from hyperspy.axes import AxesManager, UniformDataAxis
 from .bezier_curve import generate_curve
 
+
+ureg = pint.UnitRegistry()
 Degrees: TypeAlias = float
 NanoMetres: TypeAlias = float
 NMPerSecond: TypeAlias = float
@@ -240,9 +246,11 @@ class STEMImageSimulator:
         return YX(yvals.ravel(), xvals.ravel())
 
     def _apply_drift(self, point: YX, dwell_time: float):
-        drift = self._drift_for_times(self.rel_time(), point.x.size, dwell_time)
+        scan_start = self.rel_time()
+        scan_end = scan_start + point.x.size * dwell_time
+        drift = self._drift_for_times(scan_start, point.x.size, dwell_time)
         drift = YX(drift.imag, drift.real)
-        return point + drift
+        return point + drift, (scan_start, scan_end)
 
     def _wrap_coordinate(self, yx: YX):
         return yx % self._extent
@@ -279,14 +287,13 @@ class STEMImageSimulator:
         rotation: Degrees = 0.,
         wait: bool | str = False,
         progress: bool = True,
-    ) -> np.ndarray:
-        raise NotImplementedError("Need to provide the timestamp of the centre of the scan grid!!")
+    ) -> Signal2D:
         with self._scan_lock:
             tstart = time.perf_counter()
             # could add a scan pattern option
             shape = YX(*shape)
             grid = self._get_grid(tl, extent, shape, rotation)
-            grid = self._apply_drift(grid, dwell_time)
+            grid, timestamps = self._apply_drift(grid, dwell_time)
             has_defocus = self._defocus > 0.
             if has_defocus:
                 grid = self._apply_defocus(grid)
@@ -318,6 +325,35 @@ class STEMImageSimulator:
                         time.sleep(effective_dwell_time * step)
             else:
                 self._tstart -= time_to_wait
+        scales = extent / shape
+        effective_tl = tl - self.survey.tl
+        image = Signal2D(
+            image,
+            axes=[
+                UniformDataAxis(
+                    index_in_array=0,
+                    name="y",
+                    units="nm",
+                    offset=effective_tl.y,
+                    size=shape.y,
+                    scale=scales.y,
+                ),
+                UniformDataAxis(
+                    index_in_array=1,
+                    name="x",
+                    units="nm",
+                    offset=effective_tl.x,
+                    size=shape.x,
+                    scale=scales.x,
+                ),
+            ],
+            metadata=dict(
+                scan_start=timestamps[0] * ureg.second,
+                scan_end=timestamps[1] * ureg.second,
+                dwell_time=dwell_time * ureg.second,
+                rotation=rotation * ureg.degree,
+            ),
+        )
         return image
 
     @property
@@ -332,12 +368,14 @@ class STEMImageSimulator:
         """
         Acquire a new survey image with the given dwell time
         """
-        return self._scan(
+        image = self._scan(
             **self.survey._asdict(),
             dwell_time=dwell_time,
             wait="Survey" if SCAN_WAIT else False,
             progress=progress,
         )
+        image.metadata.General.title = "Survey image"
+        return image
 
     def scan(
         self,
@@ -348,7 +386,7 @@ class STEMImageSimulator:
         rotation: Degrees = 0.,
         with_grid: bool = False,
         progress: bool = True,
-    ) -> np.ndarray | tuple[np.ndarray, YX]:
+    ) -> Signal2D | tuple[Signal2D, YX]:
         """
         Acquire a scan image centered at a specified point.
 
@@ -376,8 +414,8 @@ class STEMImageSimulator:
 
         Returns
         -------
-        image : ndarray
-            The acquired scan image.
+        image : Signal2D
+            The acquired scan image as a HyperSpy `Signal2D` with calibration and metadata
         grid : YX, optional
             The scan grid in survey continuous coordinates, only returned if `with_grid` is True.
 
@@ -397,6 +435,7 @@ class STEMImageSimulator:
             wait="Scanning" if SCAN_WAIT else False,
             progress=progress,
         )
+        image.metadata.General.title = "Scan"
         if with_grid:
             grid = self._get_grid(tl, extent, scan_shape, rotation)
             return image, grid - self.survey.tl  # in continuous coords
