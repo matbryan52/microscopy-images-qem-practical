@@ -229,6 +229,16 @@ No ROI defined
     dwell_time_input.param.watch(_update_md, "value")
     rectangles.cds.on_change("data", _update_md_bk)
 
+    def reset_drift(*e):
+        simulator.reset_drift()
+
+    reset_drift_btn = pn.widgets.Button(
+        name="Reset drift",
+        button_type="warning",
+        width_policy="max",
+    )
+    reset_drift_btn.on_click(reset_drift)
+
     return pn.template.FastListTemplate(
         title="STEM Image Simulator",
         sidebar=[
@@ -251,6 +261,7 @@ No ROI defined
             scan_button,
             scan_info_md,
             pn.pane.Markdown(object="## Drift correction"),
+            reset_drift_btn,
         ],
         accent="#005da1",
         main=[

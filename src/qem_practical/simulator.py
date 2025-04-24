@@ -4,6 +4,7 @@ import operator
 from threading import Lock
 from scipy import constants
 import tqdm.auto as tqdm
+import pandas as pd
 from typing import NamedTuple, TypeAlias, Self, Literal
 from scipy.interpolate import RegularGridInterpolator
 from .bezier_curve import generate_curve
@@ -14,7 +15,7 @@ NMPerSecond: TypeAlias = float
 Seconds: TypeAlias = float
 PicoAmps: TypeAlias = float
 ELECTRON_PER_PA = 1e-12 * (1 / constants.e)
-DRIFT_HISTORY = 300
+DRIFT_HISTORY = 60 * 10
 
 SCAN_WAIT = True
 
@@ -62,6 +63,9 @@ class YX(NamedTuple):
             return YX(int(self.y), int(self.x))
         else:
             return YX(self.y.astype(int), self.x.astype(int))
+
+    def to_complex(self):
+        return self.x + self.y * 1j
 
     def asarray(self, yx: bool = True):
         array = (
@@ -164,11 +168,29 @@ class STEMImageSimulator:
 
         self._tstart = time.time()
         self._drift_gen = self._curve_generator(drift_speed)
+        self._accumulated_drift = YX(0., 0.)
         self._drift_history = {"xvals": [], "yvals": [], "time": []}
         _ = next(self._drift_gen)
 
     def rel_time(self):
         return time.time() - self._tstart
+
+    def reset_drift(self):
+        if len(self._drift_history["yvals"]) == 0:
+            return
+        with self._scan_lock:
+            _, curve = self._drift_state
+            current_drift = YX(curve.p2.imag, curve.p2.real)
+            self._accumulated_drift = current_drift
+            self._drift_history = {"xvals": [], "yvals": [], "time": []}
+
+    def drift_history(self) -> pd.DataFrame:
+        """
+        Get a pandas DataFrame of drift history
+        with columns "time" in seconds, "xvals" in nm,
+        "yvals" in nm
+        """
+        return pd.DataFrame.from_dict(self._drift_history)
 
     def _curve_generator(self, speed: float | Literal["random"] = 1.):
         if isinstance(speed, str) and speed == "random":
@@ -182,8 +204,8 @@ class STEMImageSimulator:
                 self._drift_history["xvals"].pop(0)
                 self._drift_history["yvals"].pop(0)
                 self._drift_history["time"].pop(0)
-            self._drift_history["xvals"].append(curve.p0.real)
-            self._drift_history["yvals"].append(curve.p0.imag)
+            self._drift_history["xvals"].append(curve.p0.real - self._accumulated_drift.x)
+            self._drift_history["yvals"].append(curve.p0.imag - self._accumulated_drift.y)
             self._drift_history["time"].append(self.rel_time())
             yield self._drift_state
     
