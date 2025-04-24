@@ -280,6 +280,7 @@ class STEMImageSimulator:
         wait: bool | str = False,
         progress: bool = True,
     ) -> np.ndarray:
+        raise NotImplementedError("Need to provide the timestamp of the centre of the scan grid!!")
         with self._scan_lock:
             tstart = time.perf_counter()
             # could add a scan pattern option
@@ -313,7 +314,8 @@ class STEMImageSimulator:
                     bar = no_op_tqdm()
                 for idx in range(0, npts, step):
                     bar.update(min(step, npts - idx))
-                    time.sleep(effective_dwell_time * step)
+                    if effective_dwell_time > 0:
+                        time.sleep(effective_dwell_time * step)
             else:
                 self._tstart -= time_to_wait
         return image

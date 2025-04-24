@@ -111,6 +111,7 @@ dependencies = [
     "humanize",
     "bokeh",
     "pandas",
+    "imageio",
     "libertem_ui@git+https://github.com/LiberTEM/LiberTEM-panel-ui.git"
 ]
 
