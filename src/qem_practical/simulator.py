@@ -10,11 +10,12 @@ from scipy.interpolate import RegularGridInterpolator
 import pint
 import hyperspy.api as hs
 from hyperspy._signals.signal2d import Signal2D
-from hyperspy.axes import AxesManager, UniformDataAxis
+from hyperspy.axes import AxesManager, UniformDataAxis, DataAxis
 from .bezier_curve import generate_curve
 
 
 ureg = pint.UnitRegistry()
+PositiveInt: TypeAlias = int
 Degrees: TypeAlias = float
 NanoMetres: TypeAlias = float
 NMPerSecond: TypeAlias = float
@@ -383,6 +384,7 @@ class STEMImageSimulator:
         scan_shape: PixelShapeYX,
         scan_step: NanoMetres,
         dwell_time: Seconds,
+        stack: PositiveInt | None = None,
         rotation: Degrees = 0.,
         with_grid: bool = False,
         progress: bool = True,
@@ -405,6 +407,9 @@ class STEMImageSimulator:
             The distance between scan points in nanometres.
         dwell_time : Seconds
             The dwell time of each pixel
+        stack : PositiveInt, optional
+            The number of scans to perform sequentially using the same
+            scan coordinates (default is None)
         rotation : Degrees, optional
             Angle to rotate the scan grid (default is 0 degrees). Positive is anticlockwise.
         with_grid : bool, optional
@@ -415,7 +420,9 @@ class STEMImageSimulator:
         Returns
         -------
         image : Signal2D
-            The acquired scan image as a HyperSpy `Signal2D` with calibration and metadata
+            The acquired scan image as a HyperSpy `Signal2D` with calibration and metadata.
+            If `stack` is not None then the returned image will have an additional navigation
+            dimension calibrated to the start time of each scan acquisition.
         grid : YX, optional
             The scan grid in survey continuous coordinates, only returned if `with_grid` is True.
 
@@ -423,19 +430,46 @@ class STEMImageSimulator:
         -----
         The returned grid, if requested, is relative to the survey's top-left origin.
         """
+        is_stack = stack is not None
+        if is_stack:
+            assert stack >= 1, "Stack must be a positive integer"
+        if stack is None:
+            stack = 1
         centre_scan = self.survey.to_continuous(centre)
         extent = YX(*scan_shape) * scan_step
         tl = centre_scan - (extent / 2)
-        image = self._scan(
-            tl=tl,
-            extent=extent,
-            shape=scan_shape,
-            dwell_time=dwell_time,
-            rotation=rotation,
-            wait="Scanning" if SCAN_WAIT else False,
-            progress=progress,
+        signals = []
+        iterator = (
+            tqdm.trange(stack, desc="Stack acquisition")
+            if (is_stack and progress)
+            else range(stack)
         )
-        image.metadata.General.title = "Scan"
+        for _ in iterator:
+            image = self._scan(
+                tl=tl,
+                extent=extent,
+                shape=scan_shape,
+                dwell_time=dwell_time,
+                rotation=rotation,
+                wait="Scanning" if SCAN_WAIT else False,
+                progress=progress and not is_stack,
+            )
+            image.metadata.General.title = "Scan"
+            signals.append(image)
+        if not is_stack:
+            image = signals[0]
+        else:
+            image = hs.stack(signals, new_axis_name="Time", progress=False)
+            image.metadata.scan_end = signals[-1].metadata.scan_end
+            image.axes_manager.set_axis(
+                DataAxis(
+                    name="Time",
+                    units="second",
+                    axis=[s.metadata.scan_start.magnitude for s in signals],
+                    navigate=True,
+                ),
+                image.axes_manager["Time"].index,
+            )
         if with_grid:
             grid = self._get_grid(tl, extent, scan_shape, rotation)
             return image, grid - self.survey.tl  # in continuous coords

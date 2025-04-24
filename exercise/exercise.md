@@ -148,6 +148,7 @@ drift_dataframe = simulator.drift_history()
 Create another simulator with sample drift.
 
 - Acquire a sequence of STEM scans of the same area with a moderate dwell time
+  - This can be acheived with `simulator.scan(..., stack=8)` to acquire an 8-image stack.
 - Estimate the drift between each pair of images, as in exercise 2.
 - Super-impose the images using interpolation to account for the drift
 - Display the summed image stack
