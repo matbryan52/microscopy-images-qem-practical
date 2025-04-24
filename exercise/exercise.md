@@ -40,7 +40,8 @@ The simulator object has two user-facing methods:
 survey_image = simulator.survey_image(dwell_time=1e-6)  # seconds
 ```
 
-where `survey_image` is always a `512x512` numpy array image of the field of view.
+where `survey_image` is always a `512x512` [HyperSpy](https://hyperspy.org/hyperspy-doc/current/user_guide/index.html)
+`Signal2D` image of the field of view.
 
 Secondly:
 
@@ -53,9 +54,43 @@ scan_image = simulator.scan(
 )
 ```
 
-where `scan_image` is a numpy array of size `scan_shape` scanned around `centre`.
+where `scan_image` is a [HyperSpy](https://hyperspy.org/hyperspy-doc/current/user_guide/index.html)
+`Signal2D` of size `scan_shape` scanned around `centre`.
 
-A helper for the survey image coordinate system is also available at 
+The `Signal2D` images are calibrated to the coordinate system of the simulator:
+
+```python-repl
+>>> survey.axes_manager
+<Axes manager, axes: (|512, 512)>
+            Name |   size |  index |  offset |   scale |  units
+================ | ====== | ====== | ======= | ======= | ======
+---------------- | ------ | ------ | ------- | ------- | ------
+               x |    512 |      0 |       0 |    0.24 |     nm
+               y |    512 |      0 |       0 |    0.24 |     nm
+```
+
+and so can be used for coordinate transformations:
+
+```python-repl
+# nm to pixels
+x_px = survey.axes_manager["x"].value2index(62.3)
+```
+
+and slice into an image using continuous coordinates:
+
+```python
+# slice an ROI with nanometres
+survey.isig[12.3: 24.9, 38.2: 45.1]
+```
+
+We can also plot signals using HyperSpy:
+
+```python
+import matplotlib.pyplot as plt
+survey_image.plot()
+plt.show()
+```
+<!-- A helper for the survey image coordinate system is also available at 
 
 ```python
 survey_def = simulator.survey
@@ -73,7 +108,7 @@ and methods
 ```python
 (ny, nx) = survey_def.to_continuous((py, px))  # convert from pixels to nanometres
 (py, px) = survey_def.to_pixels((ny, nx))  # convert from nanometres to pixels
-```
+``` -->
 
 There is also a UI version of the simulator which will launch in a web browser with:
 
