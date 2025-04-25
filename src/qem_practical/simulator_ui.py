@@ -263,7 +263,7 @@ No ROI defined
     )
     reset_drift_btn.on_click(reset_drift)
 
-    return pn.template.FastListTemplate(
+    return pn.template.BootstrapTemplate(
         title="STEM Image Simulator",
         sidebar=[
             pn.pane.Markdown(object="## Survey"),
@@ -291,7 +291,6 @@ No ROI defined
             pn.pane.Markdown(object="## Drift correction"),
             reset_drift_btn,
         ],
-        accent="#005da1",
         main=[
             pn.Row(
                 survey_fig.layout,
@@ -299,6 +298,4 @@ No ROI defined
             ),
             drift_fig_pane,
         ],
-        main_layout=None,
-        theme_toggle=False,
     )
