@@ -63,14 +63,3 @@ def generate_curve(start: complex = 0j, scale: float = 1.):
         p0 = p2
         p1 = continue_line(p1, p2, min_length=0.4)
         p2 = random_between(p0, p1, new_length=1.)
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots()
-    for ix, curve in enumerate(generate_curve(scale=0.1)):
-        _, B = curve.evaluate()
-        ax.plot(B.real, B.imag, 'k-')
-        if ix > 40:
-            break
-    plt.show()

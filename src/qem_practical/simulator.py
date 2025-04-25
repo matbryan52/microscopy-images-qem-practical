@@ -207,7 +207,7 @@ class STEMImageSimulator:
         return time.time() - self._tstart
 
     def reset_drift(self):
-        if len(self._drift_history["yvals"]) == 0:
+        if len(self._drift_history["p0"]) == 0:
             return
         with self._scan_lock:
             _, curve = self._drift_state
@@ -217,8 +217,7 @@ class STEMImageSimulator:
     def drift_history(self) -> pd.DataFrame:
         """
         Get a pandas DataFrame of drift history
-        with columns "time" in seconds, "xvals" in nm,
-        "yvals" in nm
+        with index "time" in seconds, and "p0", "p1", "p2" in nm
         """
         return pd.DataFrame.from_dict(self._drift_history).set_index("time")
 
@@ -521,36 +520,3 @@ class STEMImageSimulator:
             title="STEM Image Simulator",
             open=True,
         )
-
-
-if __name__ == "__main__":
-    import pathlib
-    rootdir = pathlib.Path(__file__).parent
-    import matplotlib.pyplot as plt
-
-    sim_data = np.load(rootdir / "particles.npz")
-    image = sim_data["data"]
-    data_extent = YX(*sim_data["extent"])
-    print(f"Data shape: {image.shape}, extent {data_extent} nm")
-    simulator = STEMImageSimulator(image, data_extent, drift_speed=0.1)
-
-    survey = simulator.survey_image(0.000_001, wait=False)
-    h, w = survey.shape
-    scan_centre = YX(h // 2, w // 2)
-    scan_shape = YX(512, 512)
-    scan, grid = simulator.scan(
-        scan_centre, scan_shape, 0.1, 0.00001, rotation=10, with_grid=True, wait=False
-    )
-
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-    extent = simulator.survey.extent
-    ax1.imshow(
-        survey,
-        origin='upper',
-        extent=(0, extent.x, extent.y, 0),
-        cmap="gray",
-    )
-    ax1.set_title(f"Survey image {survey.shape}")
-    ax1.plot(grid.x, grid.y, 'rx')
-    ax2.imshow(scan, cmap="gray")
-    plt.show()
