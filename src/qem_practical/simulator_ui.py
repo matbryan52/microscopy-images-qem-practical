@@ -106,8 +106,8 @@ def simulator_ui(simulator: STEMImageSimulator):
                 survey.astype(np.float32)
             )
             drift_curve.update(
-                xvals=simulator._drift_history["xvals"],
-                yvals=simulator._drift_history["yvals"],
+                xvals=[p.real for p in simulator._drift_history["p0"]],
+                yvals=[p.imag for p in simulator._drift_history["p0"]],
             )
         finally:
             survey_spinner.value = False
@@ -203,8 +203,8 @@ def simulator_ui(simulator: STEMImageSimulator):
             set_frame_height(scan_fig.fig, scan_img.shape, maxdim=MAXDIM)
             scan_fig.update(scan_img.astype(np.float32))
             drift_curve.update(
-                xvals=simulator._drift_history["xvals"],
-                yvals=simulator._drift_history["yvals"],
+                xvals=[p.real for p in simulator._drift_history["p0"]],
+                yvals=[p.imag for p in simulator._drift_history["p0"]],
             )
         finally:
             scan_button.disabled = False

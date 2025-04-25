@@ -147,31 +147,26 @@ Create the simulator with argument `drift_speed=0.` to disable drifting. This me
 - For each high-resolution image segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity). Try to express the measurements in *nanometres* rather than pixels based on the information you have about each scan.
 - Plot the distributions of the above values as histograms.
 
-### 2 - Estimate the drift rate and direction
+### 2 - Estimate the drift and correct an image stack
 
 Create a simulator with a random drift speed `drift_speed="random"`. The survey image will now change over time as particles move through the field of view. The drift rate will be approximately constant while the drift direction slowly changes over time.
 
 - Create a survey image with a short dwell time
-- Identify a cluster of particles to scan in detail
+- Identify or choose a cluster of particles to scan in detail
 - Scan the particles repeatedly and estimate the drift vector between successive frames
-- Plot the sum of the drift vector over time and compare it to the simulator's true drift curve that can be accessed with:
+  - This can be acheived with `simulator.scan(..., stack=8)` to acquire an 8-image stack.
+- Plot the drift over time and compare it to the simulator's true drift curve that can computed with:
 
 ```python
-# drift_dataframe contains columns "time", "xvals", "yvals"
-drift_dataframe = simulator.drift_history()
+# drift_dataframe contains columns "timestamp", "yvals", "xvals" in nanometres
+timestamps = stack.axes_manager["time"].axis
+drift_dataframe = simulator.drift_for_time(timestamps)
 ```
 
-### 3 - Post-acquisition alignment of an image stack
-
-Create another simulator with sample drift.
-
-- Acquire a sequence of STEM scans of the same area with a moderate dwell time
-  - This can be acheived with `simulator.scan(..., stack=8)` to acquire an 8-image stack.
-- Estimate the drift between each pair of images, as in exercise 2.
-- Super-impose the images using interpolation to account for the drift
+- Super-impose the acquired images using interpolation to correct for the drift
 - Display the summed image stack
 
-### 4 - Live drift correction
+### 3 - Live drift correction
 
 If we can estimate the drift rate periodically between acquisitions then we can track a feature over a longer period of time by shifting the scan grid to compensate. In a real microscope you might do this by adjusting *beam shift* though in the simulator the API can scan arbitrary grids.
 

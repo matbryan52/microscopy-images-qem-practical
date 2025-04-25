@@ -10,8 +10,8 @@ from scipy.interpolate import RegularGridInterpolator
 import pint
 import hyperspy.api as hs
 from hyperspy._signals.signal2d import Signal2D
-from hyperspy.axes import AxesManager, UniformDataAxis, DataAxis
-from .bezier_curve import generate_curve
+from hyperspy.axes import UniformDataAxis, DataAxis
+from .bezier_curve import generate_curve, QuadBezier
 
 
 ureg = pint.UnitRegistry()
@@ -176,9 +176,13 @@ class STEMImageSimulator:
 
         self._tstart = time.time()
         self._drift_gen = self._curve_generator(drift_speed)
-        self._accumulated_drift = YX(0., 0.)
-        self._drift_history = {"xvals": [], "yvals": [], "time": []}
+        self._accumulated_drift = 0+0j
+        self._drift_history = self._make_empty_drift_history()
         _ = next(self._drift_gen)
+
+    @staticmethod
+    def _make_empty_drift_history():
+        return {"p0": [], "p1": [], "p2": [], "time": []}
 
     def rel_time(self):
         return time.time() - self._tstart
@@ -188,9 +192,8 @@ class STEMImageSimulator:
             return
         with self._scan_lock:
             _, curve = self._drift_state
-            current_drift = YX(curve.p2.imag, curve.p2.real)
-            self._accumulated_drift = current_drift
-            self._drift_history = {"xvals": [], "yvals": [], "time": []}
+            self._accumulated_drift = curve.p2
+            self._drift_history = self._make_empty_drift_history()
 
     def drift_history(self) -> pd.DataFrame:
         """
@@ -198,23 +201,36 @@ class STEMImageSimulator:
         with columns "time" in seconds, "xvals" in nm,
         "yvals" in nm
         """
-        return pd.DataFrame.from_dict(self._drift_history)
+        return pd.DataFrame.from_dict(self._drift_history).set_index("time")
+
+    def drift_for_times(self, times: np.ndarray):
+        df = self.drift_history()
+        drifts = []
+        for idx, timestamp in zip(np.floor(times), times):
+            row = df.loc[int(idx)]
+            bezier = QuadBezier(row["p0"], row["p1"], row["p2"])
+            drifts.append(bezier.coordinate_at(timestamp % 1))
+        drifts = np.asarray(drifts)
+        return pd.DataFrame.from_dict(dict(
+            timestamp=times,
+            yvals=drifts.imag,
+            xvals=drifts.real,
+        ))
 
     def _curve_generator(self, speed: float | Literal["random"] = 1.):
         if isinstance(speed, str) and speed == "random":
             speed = float(np.random.uniform(low=0.3, high=0.6))
         for curve_idx, curve in enumerate(
             generate_curve(scale=speed),
-            start=-1,
+            # start=-1,
         ):
             self._drift_state = curve_idx, curve
-            if len(self._drift_history["yvals"]) > DRIFT_HISTORY:
-                self._drift_history["xvals"].pop(0)
-                self._drift_history["yvals"].pop(0)
-                self._drift_history["time"].pop(0)
-            self._drift_history["xvals"].append(curve.p0.real - self._accumulated_drift.x)
-            self._drift_history["yvals"].append(curve.p0.imag - self._accumulated_drift.y)
-            self._drift_history["time"].append(self.rel_time())
+            if len(self._drift_history["time"]) > DRIFT_HISTORY:
+                _ = [v.pop(0) for v in self._drift_history.values()]
+            self._drift_history["p0"].append(-1 * (curve.p0 - self._accumulated_drift))
+            self._drift_history["p1"].append(-1 * (curve.p1 - self._accumulated_drift))
+            self._drift_history["p2"].append(-1 * (curve.p2 - self._accumulated_drift))
+            self._drift_history["time"].append(int(curve_idx))
             yield self._drift_state
     
     def _drift_for_times(self, start: Seconds, number: int, step: Seconds):
@@ -464,16 +480,16 @@ class STEMImageSimulator:
         if not is_stack:
             image = signals[0]
         else:
-            image = hs.stack(signals, new_axis_name="Time", progress=False)
+            image = hs.stack(signals, new_axis_name="time", progress=False)
             image.metadata.scan_end = signals[-1].metadata.scan_end
             image.axes_manager.set_axis(
                 DataAxis(
-                    name="Time",
+                    name="time",
                     units="second",
                     axis=[s.metadata.scan_start.magnitude for s in signals],
                     navigate=True,
                 ),
-                image.axes_manager["Time"].index,
+                image.axes_manager["time"].index,
             )
         if with_grid:
             grid = self._get_grid(tl, extent, scan_shape, rotation)
