@@ -4,15 +4,23 @@ Describes the practical session for QEM2025 related to image processing.
 
 ## Setup
 
-From a terminal activate the `conda` environment using:
+The working directory `TP Images` is on the Desktop. Inside there is a shortcut to open a `Terminal` with the correct `conda` environment activated. If you don't see `(TP_AI)` before the prompt then activate the `conda` environment using:
 
-```bash
+```powershell
 conda activate TP_AI
 ```
 
-Then update the course materials using
+If `conda` is not recognized as a command then run:
 
-```bash
+```powershell
+C:\ProgramData\anaconda3\shell\condabin\conda-hook.ps1
+```
+
+then run the `activate` command from above.
+
+You can then update the course materials using:
+
+```powershell
 tp-update
 ```
 
