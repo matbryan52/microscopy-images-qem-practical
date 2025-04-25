@@ -380,7 +380,7 @@ class STEMImageSimulator:
 
     def scan(
         self,
-        centre: PixelYX,
+        centre: NanoMetreYX,
         scan_shape: PixelShapeYX,
         scan_step: NanoMetres,
         dwell_time: Seconds,
@@ -394,19 +394,19 @@ class STEMImageSimulator:
 
         Performs a raster scan over a rectangular region centered 
         at the given survey coordinates, with optional rotation. 
-        The scan is defined by its shape (in pixels), step size (in nanometres), 
+        The scan is defined by its shape (in points), step size (in nanometres), 
         and dwell time per pixel (in seconds).
 
         Parameters
         ----------
-        centre : PixelYX
-            The center of the scan grid in float-pixel survey coordinates.
+        centre : NanoMetreYX
+            The center of the scan grid in continuous survey coordinates.
         scan_shape : PixelShapeYX
-            The dimensions (rows, columns) of the scan in pixels.
+            The dimensions (rows, columns) of the scan as integer points.
         scan_step : NanoMetres
             The distance between scan points in nanometres.
         dwell_time : Seconds
-            The dwell time of each pixel
+            The dwell time of each scan point
         stack : PositiveInt, optional
             The number of scans to perform sequentially using the same
             scan coordinates (default is None)
@@ -430,14 +430,15 @@ class STEMImageSimulator:
         -----
         The returned grid, if requested, is relative to the survey's top-left origin.
         """
+        centre = YX(*centre)
+        scan_shape = YX(*scan_shape)
         is_stack = stack is not None
         if is_stack:
             assert stack >= 1, "Stack must be a positive integer"
         if stack is None:
             stack = 1
-        centre_scan = self.survey.to_continuous(centre)
-        extent = YX(*scan_shape) * scan_step
-        tl = centre_scan - (extent / 2)
+        extent = scan_shape * scan_step
+        tl = centre - (extent / 2)
         signals = []
         iterator = (
             tqdm.trange(stack, desc="Stack acquisition")

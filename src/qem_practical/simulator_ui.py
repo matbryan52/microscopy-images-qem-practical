@@ -180,7 +180,7 @@ def simulator_ui(simulator: STEMImageSimulator):
         scan_shape = (extent / scan_step).to_int()
         dwell_time = float(dwell_time_input.value) * 1e-6
         scan_img = simulator.scan(
-            YX(cy, cx), scan_shape, scan_step, dwell_time,
+            simulator.survey.to_continuous(YX(cy, cx)), scan_shape, scan_step, dwell_time,
             rotation=0, progress=False,
         ).data
 
@@ -201,7 +201,7 @@ def simulator_ui(simulator: STEMImageSimulator):
 
 No ROI defined
 """
-        cx, cy = data["cx"][0], data["cy"][0]
+        # cx, cy = data["cx"][0], data["cy"][0]
         w, h = abs(data["w"][0]), abs(data["h"][0])        
         extent = YX(h, w) * simulator.survey.scaling
         scan_step = float(scan_step_input.value)

@@ -42,7 +42,7 @@ sim_data = np.load("data/particles.npz")
 simulator = STEMImageSimulator(**sim_data)
 ```
 
-The simulator object has two user-facing methods:
+The simulator object has two primary user-facing methods, one to acquire a survey image:
 
 ```python
 survey_image = simulator.survey_image(dwell_time=1e-6)  # seconds
@@ -53,12 +53,12 @@ where `survey_image` is a `512x512` [HyperSpy](https://hyperspy.org/hyperspy-doc
 
 ![image](./survey-image.png)
 
-Secondly:
+Ando one to acquire a STEM scan:
 
 ```python
 scan_image = simulator.scan(
-    centre=(219, 307),  # centre of the scan grid in pixel coordinate system of the survey image
-    scan_shape=(100, 180),  # scan grid shape-YX
+    centre=(61.3, 34.2),  # centre of the scan grid in the coordinate system of the survey image
+    scan_shape=(100, 180),  # scan grid shape-YX (integer)
     scan_step=0.1,  # scan grid stepsize in nm
     dwell_time=1e-6,
 )
