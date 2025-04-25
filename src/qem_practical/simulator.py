@@ -2,7 +2,7 @@ import pathlib
 import time
 import operator
 from threading import Lock
-from typing import NamedTuple, TypeAlias, Self, Literal, Sequence
+from typing import NamedTuple, TypeAlias, Self, Literal, Sequence, Callable
 
 import numpy as np
 from scipy import constants
@@ -298,12 +298,20 @@ class STEMImageSimulator:
         xvals += np.asarray([0, -df, df, -df, df])
         return YX(yvals.ravel(), xvals.ravel())
 
-    def _apply_drift(self, point: YX, dwell_time: float):
+    def _apply_drift(
+        self,
+        grid: YX,
+        dwell_time: float,
+        drift_corrector: Callable[[Seconds], NanoMetreYX] | None,
+    ):
         scan_start = self.rel_time()
-        scan_end = scan_start + point.x.size * dwell_time
-        drift = self._drift_for_times(scan_start, point.x.size, dwell_time)
+        scan_end = scan_start + grid.x.size * dwell_time
+        drift = self._drift_for_times(scan_start, grid.x.size, dwell_time)
         drift = YX(drift.imag, drift.real)
-        return point + drift, (scan_start, scan_end)
+        if drift_corrector is not None:
+            dy, dx = drift_corrector(scan_start)
+            grid = grid + YX(y=dy, x=dx)
+        return grid + drift, (scan_start, scan_end)
 
     def _wrap_coordinate(self, yx: YX):
         return yx % self._extent
@@ -337,6 +345,7 @@ class STEMImageSimulator:
         extent: NanoMetreShapeYX,
         shape: PixelShapeYX,
         dwell_time: Seconds,
+        drift_corrector: Callable[[Seconds], NanoMetreYX] | None = None,
         rotation: Degrees = 0.,
         wait: bool | str = False,
         progress: bool = True,
@@ -346,7 +355,7 @@ class STEMImageSimulator:
             # could add a scan pattern option
             shape = YX(*shape)
             grid = self._get_grid(tl, extent, shape, rotation)
-            grid, timestamps = self._apply_drift(grid, dwell_time)
+            grid, timestamps = self._apply_drift(grid, dwell_time, drift_corrector)
             has_defocus = self._defocus > 0.
             if has_defocus:
                 grid = self._apply_defocus(grid)
@@ -437,7 +446,9 @@ class STEMImageSimulator:
         scan_shape: PixelShapeYX,
         scan_step: NanoMetres,
         dwell_time: Seconds,
+        *,
         stack: PositiveInt | None = None,
+        drift_corrector: Callable[[Seconds], NanoMetreYX] | None = None,
         rotation: Degrees = 0.,
         with_grid: bool = False,
         progress: bool = True,
@@ -463,6 +474,11 @@ class STEMImageSimulator:
         stack : PositiveInt, optional
             The number of scans to perform sequentially using the same
             scan coordinates (default is None)
+        drift_corrector : Callable[[Seconds], NanoMetreYX], optional
+            A function which takes the timestamp of the start of the scan
+            being run and returns a displacement of `centre`, `(dy, dx)`,
+            in nanometres to nominally correct drift. This function will be
+            called just before the start of each scan when acquiring a `stack`.
         rotation : Degrees, optional
             Angle to rotate the scan grid (default is 0 degrees). Positive is anticlockwise.
         with_grid : bool, optional
@@ -504,6 +520,7 @@ class STEMImageSimulator:
                 extent=extent,
                 shape=scan_shape,
                 dwell_time=dwell_time,
+                drift_corrector=drift_corrector,
                 rotation=rotation,
                 wait="Scanning" if SCAN_WAIT else False,
                 progress=progress and not is_stack,
@@ -515,7 +532,7 @@ class STEMImageSimulator:
         if not is_stack:
             image = signals[0]
         else:
-            image = hs.stack(signals, new_axis_name="time", progress=False)
+            image = hs.stack(signals, new_axis_name="time", show_progressbar=False)
             image.metadata.scan_end = signals[-1].metadata.scan_end
             image.axes_manager.set_axis(
                 DataAxis(

@@ -107,6 +107,7 @@ dependencies = [
     "numba",
     "scipy",
     "scikit-image",
+    "scikit-learn",
     "tqdm",
     "humanize",
     "bokeh",

@@ -168,7 +168,16 @@ drift_dataframe = simulator.drift_for_time(timestamps)
 
 ### 3 - Live drift correction
 
-If we can estimate the drift rate periodically between acquisitions then we can track a feature over a longer period of time by shifting the scan grid to compensate. In a real microscope you might do this by adjusting *beam shift* though in the simulator the API can scan arbitrary grids.
+If we can estimate the drift rate periodically then we can also shift the scan grid predictively in compensation - in a real microscope you might do this by adjusting *beam shift*. In the simulator we can supply a function which takes the timestamp of the scan about to start, and moves the `centre` of the scan grid by some amount. A simple function to do this would be:
+
+```python
+def predict_drift(scan_time: float) -> tuple[float, float]:
+    return (1. * scan_time, -0.3 * scan_time)
+```
+
+which would move the supplied scan `centre` coordinate by `(1, -0.3)` nm for every second since the simulator was created.
+
+Such a function would need to be created from a sequence of drift-measurement acquisitions, then applied to a scan. The function would be less and less valid over time as the drift of the sample is not stable. The correction function would therefore need to be re-measured periodically.
 
 - Acquire a survey image and select a particle to track
 - Alternate between drift estimation and imaging steps
