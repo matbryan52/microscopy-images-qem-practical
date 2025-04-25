@@ -2,7 +2,7 @@ import pathlib
 import time
 import operator
 from threading import Lock
-from typing import NamedTuple, TypeAlias, Self, Literal
+from typing import NamedTuple, TypeAlias, Self, Literal, Sequence
 
 import numpy as np
 from scipy import constants
@@ -221,7 +221,24 @@ class STEMImageSimulator:
         """
         return pd.DataFrame.from_dict(self._drift_history).set_index("time")
 
-    def drift_for_times(self, times: np.ndarray):
+    def drift_for_times(self, times: Sequence[Seconds]):
+        """
+        Get the groundtruth drift value for timestamps in the recent past
+
+        Parameters
+        ----------
+        times : Sequence[Seconds]
+            Timestamps of images returned by this simulator, available as
+            `signal.metadata.scan_start.magnitude` or as `signal.axes_metadata["time"].axis`
+            for an image stack
+
+        Returns
+        -------
+        pd.DataFrame
+            A dataframe of absolute drift values with columns "timestamp", "yvals"
+            and "xvals" in nanometres. Note the drifts are relative to `t==0` and so
+            need to be normalised to the start of `times` if relative drift is desired.
+        """
         df = self.drift_history()
         drifts = []
         for idx, timestamp in zip(np.floor(times), times):

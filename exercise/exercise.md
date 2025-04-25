@@ -180,4 +180,4 @@ If we can estimate the drift rate periodically between acquisitions then we can 
 
 ## Notes and hints
 
-HyperSpy can handle more than just spectra; it has a number of image processing features which will be useful for the exercises. Consider reading the user guide of [Signal2D](https://hyperspy.org/hyperspy-doc/current/user_guide/signal2d.html) and its [documentation](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D).
+HyperSpy can handle more than just spectra; it has a number of image processing features which will **very** be useful for the exercises. Consider reading the user guide of [Signal2D](https://hyperspy.org/hyperspy-doc/current/user_guide/signal2d.html) and its [documentation](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D).
