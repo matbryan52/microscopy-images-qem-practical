@@ -1,16 +1,19 @@
-import numpy as np
+import pathlib
 import time
 import operator
 from threading import Lock
+from typing import NamedTuple, TypeAlias, Self, Literal
+
+import numpy as np
 from scipy import constants
 import tqdm.auto as tqdm
 import pandas as pd
-from typing import NamedTuple, TypeAlias, Self, Literal
 from scipy.interpolate import RegularGridInterpolator
 import pint
 import hyperspy.api as hs
 from hyperspy._signals.signal2d import Signal2D
 from hyperspy.axes import UniformDataAxis, DataAxis
+
 from .bezier_curve import generate_curve, QuadBezier
 
 
@@ -179,6 +182,22 @@ class STEMImageSimulator:
         self._accumulated_drift = 0+0j
         self._drift_history = self._make_empty_drift_history()
         _ = next(self._drift_gen)
+
+    @classmethod
+    def default(
+        cls,
+        current: PicoAmps = 1,
+        drift_speed: NMPerSecond | Literal["random"] = "random",
+        defocus: NanoMetres = 0.,
+    ):
+        rootdir = pathlib.Path(__file__).parent.parent.parent
+        sim_data = np.load(rootdir / "data" / "particles.npz")
+        return cls(
+            **sim_data,
+            current=current,
+            drift_speed=drift_speed,
+            defocus=defocus,
+        )
 
     @staticmethod
     def _make_empty_drift_history():
