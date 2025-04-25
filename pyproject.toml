@@ -112,7 +112,9 @@ dependencies = [
     "bokeh",
     "pandas",
     "imageio",
+    "jupyterlab",
     "hyperspy",
+    "hyperspy_gui_ipywidgets",
     "libertem_ui@git+https://github.com/LiberTEM/LiberTEM-panel-ui.git"
 ]
 

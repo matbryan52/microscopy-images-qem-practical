@@ -114,6 +114,18 @@ plt.show()
 
 ![image](./hyperspy-plot.png)
 
+The returned `Signal2D` also contains metadata about the scan:
+
+```python-repl
+>>> survey.metadata
+title = Survey image
+current = <Quantity(1e-11, 'ampere')>
+dwell_time = <Quantity(1e-05, 'second')>
+rotation = <Quantity(0.0, 'degree')>
+scan_end = <Quantity(2.62452228, 'second')>
+scan_start = <Quantity(0.00308227539, 'second')>
+```
+
 There is also a UI version of the simulator which will launch in a web browser with:
 
 ```python

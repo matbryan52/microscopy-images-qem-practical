@@ -354,6 +354,7 @@ class STEMImageSimulator:
                 scan_end=timestamps[1] * ureg.second,
                 dwell_time=dwell_time * ureg.second,
                 rotation=rotation * ureg.degree,
+                current=self._current * 1e-12 * ureg.ampere,
             ),
         )
         return image
