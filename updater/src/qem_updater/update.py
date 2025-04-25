@@ -1,4 +1,5 @@
 import pathlib
+import shutil
 import qem_practical
 rootdir = pathlib.Path(qem_practical.__file__).parent.parent.parent
 import subprocess
@@ -19,3 +20,8 @@ def update():
         shell=True,
     )
     print(output.decode('utf-8'))
+
+    shutil.copyfile(
+        rootdir / "main.py",
+        rootdir.parent / "Workspace" / "main.py",
+    )
