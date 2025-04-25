@@ -40,15 +40,17 @@ The simulator object has two user-facing methods:
 survey_image = simulator.survey_image(dwell_time=1e-6)  # seconds
 ```
 
-where `survey_image` is always a `512x512` [HyperSpy](https://hyperspy.org/hyperspy-doc/current/user_guide/index.html)
+where `survey_image` is a `512x512` [HyperSpy](https://hyperspy.org/hyperspy-doc/current/user_guide/index.html)
 `Signal2D` image of the field of view.
+
+![image](./survey-image.png)
 
 Secondly:
 
 ```python
 scan_image = simulator.scan(
-    centre=(219, 307),  # centre of the scan grid in pixel coordinates of the survey image
-    scan_shape=(64, 64),  # scan grid shape-YX
+    centre=(219, 307),  # centre of the scan grid in pixel coordinate system of the survey image
+    scan_shape=(100, 180),  # scan grid shape-YX
     scan_step=0.1,  # scan grid stepsize in nm
     dwell_time=1e-6,
 )
@@ -57,7 +59,9 @@ scan_image = simulator.scan(
 where `scan_image` is a [HyperSpy](https://hyperspy.org/hyperspy-doc/current/user_guide/index.html)
 `Signal2D` of size `scan_shape` scanned around `centre`.
 
-The `Signal2D` images are calibrated to the coordinate system of the simulator:
+![image](./scan.png)
+
+The output `Signal2D` images are calibrated to the coordinate system of the simulator:
 
 ```python-repl
 >>> survey.axes_manager
@@ -83,6 +87,15 @@ and slice into an image using continuous coordinates:
 survey.isig[12.3: 24.9, 38.2: 45.1]
 ```
 
+For convenience the simulator also provides its own coordinate transformation helpers:
+
+```python
+(ny, nx) = simulator.survey.to_continuous((py, px))  # convert from pixels to nanometres
+(py, px) = simulator.survey.to_pixels((ny, nx))  # convert from nanometres to pixels
+(sy, sx) = simulator.survey.scaling  #  scaling of the survey field of view in nm / pixel
+(ey, ex) = simulator.survey.extent  # size of the survey field of view in nm
+```
+
 We can also plot signals using HyperSpy:
 
 ```python
@@ -90,31 +103,16 @@ import matplotlib.pyplot as plt
 survey_image.plot()
 plt.show()
 ```
-<!-- A helper for the survey image coordinate system is also available at 
 
-```python
-survey_def = simulator.survey
-```
-
-with properties:
-
-```python
-(sy, sx) = survey_def.scaling  #  scaling of the survey field of view in nm / pixel
-(ey, ex) = survey_def.extent  # shape of the survey field of view in nm
-```
-
-and methods
-
-```python
-(ny, nx) = survey_def.to_continuous((py, px))  # convert from pixels to nanometres
-(py, px) = survey_def.to_pixels((ny, nx))  # convert from nanometres to pixels
-``` -->
+![image](./hyperspy-plot.png)
 
 There is also a UI version of the simulator which will launch in a web browser with:
 
 ```python
 simulator.show()
 ```
+
+![image](./ui.png)
 
 ## Exercises
 
@@ -163,3 +161,8 @@ If we can estimate the drift rate periodically between acquisitions then we can 
 - Shift the scan grid with the drift vector to track a particle to the edge of the frame
   - Consider taking into account the time between the measurement of the drift and the next scan.
 - Generate a GIF of the scan images using `imageio`
+
+
+## Notes and hints
+
+HyperSpy can handle more than just spectra; it has a number of image processing features which will be useful for the exercises. Consider reading the user guide of [Signal2D](https://hyperspy.org/hyperspy-doc/current/user_guide/signal2d.html) and its [documentation](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D).
