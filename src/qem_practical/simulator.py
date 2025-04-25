@@ -25,6 +25,7 @@ ELECTRON_PER_PA = 1e-12 * (1 / constants.e)
 DRIFT_HISTORY = 60 * 10
 
 SCAN_WAIT = True
+SCAN_DEAD_TIME = 0.2
 
 class no_op_tqdm:
     def update(self, *args, **kwargs):
@@ -457,6 +458,8 @@ class STEMImageSimulator:
             )
             image.metadata.General.title = "Scan"
             signals.append(image)
+            if is_stack:
+                time.sleep(SCAN_DEAD_TIME)
         if not is_stack:
             image = signals[0]
         else:

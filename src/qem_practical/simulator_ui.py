@@ -92,7 +92,10 @@ def simulator_ui(simulator: STEMImageSimulator):
 
     survey_spinner = pn.indicators.LoadingSpinner(
         value=False,
-        width=35, height=35,
+        width=35,
+        height=35,
+        bgcolor="dark",
+        color="success",
     )
 
     def update_survey(*e):
@@ -167,26 +170,47 @@ def simulator_ui(simulator: STEMImageSimulator):
         width_policy="max",
     )
     live_survey_button.jslink(scan_button, **{"value": "disabled"})
+    scan_spinner = pn.indicators.LoadingSpinner(
+        value=False,
+        width=35,
+        height=35,
+        bgcolor="dark",
+        color="success",
+    )
 
     def do_scan(*e):
         data = rectangles.cds.data
         if len(data["cx"]) == 0:
             return
-        cx, cy = data["cx"][0], data["cy"][0]
-        w, h = abs(data["w"][0]), abs(data["h"][0])
+        try:
+            scan_button.disabled = True
+            scan_spinner.value = True
+            live_survey_button.disabled = True
+            single_survey.disabled = True
+            cx, cy = data["cx"][0], data["cy"][0]
+            w, h = abs(data["w"][0]), abs(data["h"][0])
 
-        extent = YX(h, w) * simulator.survey.scaling
-        scan_step = float(scan_step_input.value)
-        scan_shape = (extent / scan_step).to_int()
-        dwell_time = float(dwell_time_input.value) * 1e-6
-        scan_img = simulator.scan(
-            simulator.survey.to_continuous(YX(cy, cx)), scan_shape, scan_step, dwell_time,
-            rotation=0, progress=False,
-        ).data
+            extent = YX(h, w) * simulator.survey.scaling
+            scan_step = float(scan_step_input.value)
+            scan_shape = (extent / scan_step).to_int()
+            dwell_time = float(dwell_time_input.value) * 1e-6
+            scan_img = simulator.scan(
+                simulator.survey.to_continuous(YX(cy, cx)), scan_shape, scan_step, dwell_time,
+                rotation=0, progress=False,
+            ).data
 
-        update_cal_axes(scan_fig.fig, extent)
-        set_frame_height(scan_fig.fig, scan_img.shape, maxdim=MAXDIM)
-        scan_fig.update(scan_img.astype(np.float32))
+            update_cal_axes(scan_fig.fig, extent)
+            set_frame_height(scan_fig.fig, scan_img.shape, maxdim=MAXDIM)
+            scan_fig.update(scan_img.astype(np.float32))
+            drift_curve.update(
+                xvals=simulator._drift_history["xvals"],
+                yvals=simulator._drift_history["yvals"],
+            )
+        finally:
+            scan_button.disabled = False
+            scan_spinner.value = False
+            live_survey_button.disabled = False
+            single_survey.disabled = False
 
     scan_button.on_click(do_scan)
 
@@ -233,7 +257,7 @@ No ROI defined
         simulator.reset_drift()
 
     reset_drift_btn = pn.widgets.Button(
-        name="Reset drift",
+        name="Reset drift history",
         button_type="warning",
         width_policy="max",
     )
@@ -258,7 +282,11 @@ No ROI defined
 ## Scan"""),
             scan_step_input,
             dwell_time_input,
-            scan_button,
+            pn.Row(
+                scan_button,
+                scan_spinner,
+                width_policy="max",
+            ),
             scan_info_md,
             pn.pane.Markdown(object="## Drift correction"),
             reset_drift_btn,
