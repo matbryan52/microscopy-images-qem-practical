@@ -1,6 +1,6 @@
-# QEM 2025 Practical Session
+# QEM 2025 Image Processing Practical Session
 
-This document describes the practical session for QEM2025 related to image processing.
+Describes the practical session for QEM2025 related to image processing.
 
 ## Setup
 
