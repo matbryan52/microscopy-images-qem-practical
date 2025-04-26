@@ -553,6 +553,11 @@ class STEMImageSimulator:
                 np.asarray([s.axes_manager["x"].offset for s in signals]),
             )
             image.metadata.corrected_centre = true_tl + (extent / 2)
+            if is_stack:
+                image.metadata.correction = YX(
+                    y=np.asarray([s.metadata.correction.y for s in signals]),
+                    x=np.asarray([s.metadata.correction.x for s in signals]),
+                )
         if with_grid:
             grid = self._get_grid(tl, extent, scan_shape, rotation)
             return image, grid - self.survey.tl  # in continuous coords
