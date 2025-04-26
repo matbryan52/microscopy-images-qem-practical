@@ -136,14 +136,14 @@ class ScanDef(NamedTuple):
         Convert from survey pixel to continuous units
         """
         point = YX(*point)
-        return self.tl + (point * self.scaling)
+        return point * self.scaling
 
     def to_pixels(self, point: NanoMetreYX) -> PixelYX:
         """
         Convert from continuous to survey pixel units
         """
         point = YX(*point)
-        return (point - self.tl) / self.scaling
+        return point / self.scaling
 
 
 class STEMImageSimulator:
@@ -254,7 +254,7 @@ class STEMImageSimulator:
 
     def _curve_generator(self, speed: float | Literal["random"] = 1.):
         if isinstance(speed, str) and speed == "random":
-            speed = float(np.random.uniform(low=0.3, high=0.6))
+            speed = float(np.random.uniform(low=0.5, high=0.8))
         for curve_idx, curve in enumerate(
             generate_curve(scale=speed),
             # start=-1,
@@ -301,17 +301,12 @@ class STEMImageSimulator:
     def _apply_drift(
         self,
         grid: YX,
-        dwell_time: float,
-        drift_corrector: Callable[[Seconds], NanoMetreYX] | None,
+        scan_start: Seconds,
+        dwell_time: Seconds,
     ):
-        scan_start = self.rel_time()
-        scan_end = scan_start + grid.x.size * dwell_time
         drift = self._drift_for_times(scan_start, grid.x.size, dwell_time)
         drift = YX(drift.imag, drift.real)
-        if drift_corrector is not None:
-            dy, dx = drift_corrector(scan_start)
-            grid = grid + YX(y=dy, x=dx)
-        return grid + drift, (scan_start, scan_end)
+        return grid + drift
 
     def _wrap_coordinate(self, yx: YX):
         return yx % self._extent
@@ -341,7 +336,7 @@ class STEMImageSimulator:
     def _scan(
         self,
         *,
-        tl: NanoMetreYX,
+        tl: NanoMetreYX,  # top-left in the *survey* coordinate system
         extent: NanoMetreShapeYX,
         shape: PixelShapeYX,
         dwell_time: Seconds,
@@ -354,8 +349,15 @@ class STEMImageSimulator:
             tstart = time.perf_counter()
             # could add a scan pattern option
             shape = YX(*shape)
-            grid = self._get_grid(tl, extent, shape, rotation)
-            grid, timestamps = self._apply_drift(grid, dwell_time, drift_corrector)
+            scan_start = self.rel_time()
+            correction = None
+            if drift_corrector is not None:
+                correction = YX(*drift_corrector(scan_start))
+                tl = tl + correction
+            effective_tl = tl + self.survey.tl
+            scan_end = scan_start + np.prod(shape) * dwell_time
+            grid = self._get_grid(effective_tl, extent, shape, rotation)
+            grid = self._apply_drift(grid, scan_start, dwell_time)
             has_defocus = self._defocus > 0.
             if has_defocus:
                 grid = self._apply_defocus(grid)
@@ -388,7 +390,6 @@ class STEMImageSimulator:
             else:
                 self._tstart -= time_to_wait
         scales = extent / shape
-        effective_tl = tl - self.survey.tl
         image = Signal2D(
             image,
             axes=[
@@ -396,7 +397,7 @@ class STEMImageSimulator:
                     index_in_array=0,
                     name="y",
                     units="nm",
-                    offset=effective_tl.y,
+                    offset=tl.y,
                     size=shape.y,
                     scale=scales.y,
                 ),
@@ -404,17 +405,18 @@ class STEMImageSimulator:
                     index_in_array=1,
                     name="x",
                     units="nm",
-                    offset=effective_tl.x,
+                    offset=tl.x,
                     size=shape.x,
                     scale=scales.x,
                 ),
             ],
             metadata=dict(
-                scan_start=timestamps[0] * ureg.second,
-                scan_end=timestamps[1] * ureg.second,
+                scan_start=scan_start * ureg.second,
+                scan_end=scan_end * ureg.second,
                 dwell_time=dwell_time * ureg.second,
                 rotation=rotation * ureg.degree,
                 current=self._current * 1e-12 * ureg.ampere,
+                correction=correction,
             ),
         )
         return image
@@ -432,7 +434,9 @@ class STEMImageSimulator:
         Acquire a new survey image with the given dwell time
         """
         image = self._scan(
-            **self.survey._asdict(),
+            tl=YX(0., 0.),
+            extent=self.survey.extent,
+            shape=self.survey.shape,
             dwell_time=dwell_time,
             wait="Survey" if SCAN_WAIT else False,
             progress=progress,
@@ -543,6 +547,12 @@ class STEMImageSimulator:
                 ),
                 image.axes_manager["time"].index,
             )
+        if drift_corrector is not None:
+            true_tl = YX(
+                np.asarray([s.axes_manager["y"].offset for s in signals]),
+                np.asarray([s.axes_manager["x"].offset for s in signals]),
+            )
+            image.metadata.corrected_centre = true_tl + (extent / 2)
         if with_grid:
             grid = self._get_grid(tl, extent, scan_shape, rotation)
             return image, grid - self.survey.tl  # in continuous coords
