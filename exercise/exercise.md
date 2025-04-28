@@ -144,7 +144,7 @@ Create the simulator with argument `drift_speed=0.` to disable drifting. This me
 
 - From a survey image taken at a long dwell time locate all of the particles in the field of view using a peak-finding or similar approach
 - For some of the detected particles run a detailed STEM scan of each and display the high-resolution images on the same figure
-- For each high-resolution image segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity). Try to express the measurements in *nanometres* rather than pixels based on the information you have about each scan.
+- For each high-resolution image segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity). Try to express the measurements in *nanometres* rather than pixels based on the information you have about each scan. (Hint, take a look at [`skimage.measure.regionprops`](https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops)).
 - Plot the distributions of the above values as histograms.
 
 ### 2 - Estimate the drift and correct an image stack
@@ -168,7 +168,7 @@ drift_dataframe = simulator.drift_for_time(timestamps)
 
 ### 3 - Live drift correction
 
-If we can estimate the drift rate periodically then we can also shift the scan grid predictively in compensation - in a real microscope you might do this by adjusting *beam shift*. In the simulator we can supply a function which takes the timestamp of the scan about to start, and moves the `centre` of the scan grid by some amount. A simple function to do this would be:
+If we can estimate the drift rate periodically then we can also shift the scan grid predictively in compensation - in a real microscope you might do this by adjusting *beam shift*. In the simulator we can supply a function `drift_corrector` which takes the timestamp of the scan about to start, and shifts the supplied `centre` of the scan grid by some amount. A simple function to do this would be:
 
 ```python
 def predict_drift(scan_time: float) -> tuple[float, float]:
@@ -177,15 +177,16 @@ def predict_drift(scan_time: float) -> tuple[float, float]:
 
 which would move the supplied scan `centre` coordinate by `(1, -0.3)` nm for every second since the simulator was created.
 
-Such a function would need to be created from a sequence of drift-measurement acquisitions, then applied to a scan. The function would be less and less valid over time as the drift of the sample is not stable. The correction function would therefore need to be re-measured periodically.
+Such a function would need to be created from a sequence of drift-measurement acquisitions, then applied to a new scan. The function would be less and less valid over time as the drift of the sample is not stable. The correction function would therefore need to be re-measured periodically.
 
-- Acquire a survey image and select a particle to track
-- Alternate between drift estimation and imaging steps
-  - The drift can be computed on the particle being tracked or from a larger field of view scan.
-- Shift the scan grid with the drift vector to track a particle to the edge of the frame
-  - Consider taking into account the time between the measurement of the drift and the next scan.
-- Generate a GIF of the scan images using `imageio`
-
+- Acquire a survey image and select a zone to track
+- Acquire a stack of images of the tracking region
+- Evaluate the drift as in exercise 2, then fit a function to predict it as a function of scan time
+  - The `"time"` axis of a stack acquisition is calibrated to scan time
+- Supply the `drift_corrector` function to a new stack acquisition on the same or a new area
+- Plot the results to prove the drift correction is working
+  - Sum an uncorrected stack and a corrected stack to see if the detail improves
+  - Generate a GIF of the scan images using `imageio.v3.imwrite`
 
 ## Notes and hints
 
