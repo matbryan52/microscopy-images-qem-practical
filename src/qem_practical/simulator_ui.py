@@ -1,15 +1,72 @@
 import numpy as np
 import panel as pn
+from itertools import pairwise
 import humanize
-from bokeh.models import LinearAxis, Range1d
+from bokeh.models import LinearAxis, Range1d, Legend, LegendItem
 from bokeh.plotting import figure
+from skimage.registration import phase_cross_correlation
 pn.extension("floatpanel")
 
 from libertem_ui.figure import ApertureFigure, set_frame_height
-from libertem_ui.display.display_base import Rectangles, Curve
+from libertem_ui.display.display_base import Rectangles, Curve, PointSet
 from .simulator import STEMImageSimulator, YX
 
 MAXDIM = 512
+
+
+def interp_sequence(times, period):
+    if len(times) == 0:
+        raise
+    elif len(times) == 1:
+        yield times[0]
+        return
+    for t0, t1 in pairwise(times):
+        interval = t1 - t0
+        if period > interval:
+            yield t0
+        else:
+            yield from np.linspace(t0, t1, num=int(interval / period), endpoint=False)
+
+
+class DriftEstimator:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self._current_drift = np.asarray((0., 0.))
+        self._last_roi = None
+        self._last_roi_slice = None
+        self._drift_history = {"xvals": [0.], "yvals": [0.], "timestamp": [None]}
+
+    def estimate(self, survey, rectangles):
+        roi_data = rectangles.cds.data
+        scale = survey.axes_manager["x"].scale
+        this_drift = None
+        if len(roi_data["cx"]) > 0:
+            cx, cy = int(roi_data["cx"][0]), int(roi_data["cy"][0])
+            w, h = abs(roi_data["w"][0]), abs(roi_data["h"][0])
+            w2, h2 = w // 2, h // 2
+            roi_slice = np.s_[cy - h2: cy + h2 + 1, cx - w2: cx + w2 + 1]
+            drift_roi = survey.data[roi_slice]
+            drift_roi = np.fft.fft2(drift_roi)
+            if self._last_roi_slice is not None and self._last_roi_slice != roi_slice:
+                self.reset()
+            if self._last_roi is not None:
+                this_drift, _, _ = phase_cross_correlation(
+                    self._last_roi,
+                    drift_roi,
+                    space="fourier",
+                    upsample_factor=10,
+                )
+                self._current_drift -= this_drift * scale
+                self._drift_history["yvals"].append(self._current_drift[0])
+                self._drift_history["xvals"].append(self._current_drift[1])
+                self._drift_history["timestamp"].append(survey.metadata.scan_start.magnitude)
+            else:
+                self._drift_history["timestamp"][0] = survey.metadata.scan_start.magnitude
+            self._last_roi = drift_roi
+            self._last_roi_slice = roi_slice
+        return this_drift
 
 
 def add_cal_axes(fig, extent, label):
@@ -62,6 +119,29 @@ def simulator_ui(simulator: STEMImageSimulator):
     tools = rectangles.tools("rectangles", survey_fig.fig)
     tools[survey_fig.fig][0].num_objects = 1
 
+    drift_roi = (
+        Rectangles
+        .new()
+        .empty()
+        .on(survey_fig.fig)
+        .editable(
+            selected=False,
+            tag_name="drift_roi",
+        )
+    )
+    drift_roi.rectangles.fill_color = "CornflowerBlue"
+    drift_roi.rectangles.line_color = "CornflowerBlue"
+
+    tools = drift_roi.tools("rectangles", survey_fig.fig)
+    tools[survey_fig.fig][0].num_objects = 1
+
+    estimate_drift_button = pn.widgets.Toggle(
+        name="Estimate drift",
+        value=False,
+        width_policy="max",
+        button_type="success",
+    )
+    drift_estimator = DriftEstimator()
 
     drift_fig = figure(title='Drift', match_aspect=True)
     drift_fig_pane = pn.pane.Bokeh(drift_fig)
@@ -71,10 +151,38 @@ def simulator_ui(simulator: STEMImageSimulator):
         .empty()
         .on(drift_fig)
     )
+    drift_curve_points = (
+        PointSet(
+            drift_curve.cds,
+            x="xvals",
+            y="yvals",
+        )
+        .on(drift_fig)
+    )
+    drift_curve_points.points.fill_color = None
+    drift_curve_points.points.line_color = "black"
     drift_fig.xaxis.axis_label="x-drift (nm)"
     drift_fig.yaxis.axis_label="y-drift (nm)"
     drift_fig.y_range.flipped = True
+    true_drift_curve = (
+        Curve
+        .new()
+        .empty()
+        .on(drift_fig)
+    )
+    true_drift_curve.glyph.line_dash = "dashed"
 
+    true_drift_renderer = true_drift_curve.renderers_for_fig("curve", drift_fig)[0]
+    drift_renderer = drift_curve.renderers_for_fig("curve", drift_fig)[0]
+    legend = Legend(
+        items=[
+            LegendItem(label="Estimated Drift", renderers=[drift_renderer]),
+            LegendItem(label="True Drift", renderers=[true_drift_renderer])
+        ],
+        location="top_right",
+        orientation="vertical",
+    )
+    drift_fig.add_layout(legend, "center")
 
     live_survey_button = pn.widgets.Toggle(
         name="Live survey",
@@ -101,20 +209,35 @@ def simulator_ui(simulator: STEMImageSimulator):
     def update_survey(*e):
         try:
             survey_spinner.value = True
-            survey = simulator.survey_image(survey_dwell_time, progress=False).data
+            survey = simulator.survey_image(survey_dwell_time, progress=False)
             survey_fig.update(
-                survey.astype(np.float32)
+                survey.data.astype(np.float32)
             )
-            drift_curve.update(
-                xvals=[p.real for p in simulator._drift_history["p0"]],
-                yvals=[p.imag for p in simulator._drift_history["p0"]],
-            )
+            if estimate_drift_button.value:
+                this_drift = drift_estimator.estimate(survey, drift_roi)
+                drift_curve.update(
+                    xvals=drift_estimator._drift_history["xvals"],
+                    yvals=drift_estimator._drift_history["yvals"],
+                )
+                timestamps = drift_estimator._drift_history["timestamp"]
+                drifts = simulator.drift_for_times(tuple(interp_sequence(timestamps, 0.1)))
+                true_drift_curve.update(
+                    xvals=drifts["xvals"] - drifts["xvals"][0],
+                    yvals=drifts["yvals"] - drifts["yvals"][0],
+                )
+
+                scan_roi = rectangles.cds.data
+                if this_drift is not None and len(scan_roi["cx"]) > 0:
+                    rectangles.cds.data.update(
+                        cx=[x - this_drift[1] for x in scan_roi["cx"]],
+                        cy=[y - this_drift[0] for y in scan_roi["cy"]],
+                    )
         finally:
             survey_spinner.value = False
 
     update_cb = pn.state.add_periodic_callback(
         update_survey,
-        period=1000,
+        period=3000,
         start=False,
     )
 
@@ -254,7 +377,7 @@ No ROI defined
     rectangles.cds.on_change("data", _update_md_bk)
 
     def reset_drift(*e):
-        simulator.reset_drift()
+        drift_estimator.reset()
 
     reset_drift_btn = pn.widgets.Button(
         name="Reset drift history",
@@ -290,6 +413,7 @@ No ROI defined
             scan_info_md,
             pn.pane.Markdown(object="## Drift correction"),
             reset_drift_btn,
+            estimate_drift_button,
         ],
         main=[
             pn.Row(
