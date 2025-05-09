@@ -175,7 +175,8 @@ class STEMImageSimulator:
             shape=YX(512, 512),
         )
         self._current = current
-        self._defocus = defocus
+        self._true_defocus = defocus
+        self._defocus = 0.
 
         self._tstart = time.time()
         self._drift_gen = self._curve_generator(drift_speed)
@@ -290,12 +291,27 @@ class STEMImageSimulator:
             start_in_curve = 0
         return np.concatenate(coordinates, axis=0)
 
+    @property
+    def _defocus_value(self) -> float:
+        return abs(self._true_defocus - self._defocus)
+
+    @property
+    def _defocus_points(self) -> int:
+        return 9
+
+    def set_focus(self, val: NanoMetres):
+        self._defocus = val
+
     def _apply_defocus(self, point: YX):
-        df = self._defocus
-        yvals = np.tile(point.y[:, np.newaxis], (1, 5))
-        xvals = np.tile(point.x[:, np.newaxis], (1, 5))
-        yvals += np.asarray([0, -df, -df, df, df])
-        xvals += np.asarray([0, -df, df, -df, df])
+        df = self._defocus_value
+        dp = self._defocus_points
+        angles = np.linspace(0., 2 * np.pi, num=dp, endpoint=True)
+        offsets = df * np.exp(1j * angles)
+        offsets[0] = 0 + 0j
+        yvals = np.tile(point.y[:, np.newaxis], (1, dp))
+        xvals = np.tile(point.x[:, np.newaxis], (1, dp))
+        yvals += offsets.imag
+        xvals += offsets.real
         return YX(yvals.ravel(), xvals.ravel())
 
     def _apply_drift(
@@ -358,7 +374,7 @@ class STEMImageSimulator:
             scan_end = scan_start + np.prod(shape) * dwell_time
             grid = self._get_grid(effective_tl, extent, shape, rotation)
             grid = self._apply_drift(grid, scan_start, dwell_time)
-            has_defocus = self._defocus > 0.
+            has_defocus = self._defocus_value > 0.
             if has_defocus:
                 grid = self._apply_defocus(grid)
             grid = self._wrap_coordinate(grid)
@@ -369,8 +385,9 @@ class STEMImageSimulator:
                 )
             )
             if has_defocus:
-                image = image.reshape(-1, 5).mean(axis=-1)
-                grid = YX(grid.y[::5], grid.x[::5])
+                dp = self._defocus_points
+                image = image.reshape(-1, dp).mean(axis=-1)
+                grid = YX(grid.y[::dp], grid.x[::dp])
             image = image.reshape(shape)
             tspent = time.perf_counter() - tstart
             npts = grid.x.size

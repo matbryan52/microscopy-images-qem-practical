@@ -283,7 +283,7 @@ def simulator_ui(simulator: STEMImageSimulator):
         color="success",
     )
 
-    drift_info_md = pn.pane.Markdown(object="No drift information")
+    drift_info_md = pn.pane.Markdown(object="No drift information", margin=(5, 5))
 
     def _format_drift_info():
         drift_yx = drift_estimator.current_drift_nm()
@@ -469,7 +469,8 @@ No ROI defined
 """
 
     scan_info_md = pn.pane.Markdown(
-        object=scan_info_str()
+        object=scan_info_str(),
+        margin=(5, 5),
     )
 
     def _update_md(*e):
@@ -512,7 +513,8 @@ No ROI defined
     reset_drift_btn.on_click(reset_drift)
 
     current_slider = pn.widgets.FloatSlider(
-        name="Current (pA)", value=simulator._current,
+        name="Beam current",
+        value=simulator._current,
         start=0.1, end=5., step=0.1,
         width_policy="max",
         max_width=300,
@@ -525,13 +527,13 @@ No ROI defined
 
     defocus_slider = pn.widgets.FloatSlider(
         name="Focus", value=0.,
-        start=-2., end=2., step=0.1,
+        start=-1.5, end=1.5, step=0.1,
         width_policy="max",
         max_width=300,
     )
 
     def _set_defocus(*e):
-        simulator._defocus = abs(defocus_slider.value)
+        simulator.set_focus(defocus_slider.value)
     
     defocus_slider.param.watch(_set_defocus, "value")
 
@@ -607,7 +609,7 @@ With drift estimation enabled it should be possible to take a reasonably sharp s
         title="STEM Imaging Simulator",
         sidebar=[
             pn.Row(modal_btn, shutdown_btn, width_policy="max"),
-            pn.pane.Markdown(object="## Survey"),
+            pn.pane.Markdown(object="## Survey", margin=(2, 5)),
             pn.Row(
                 live_survey_button,
                 single_survey,
@@ -620,7 +622,7 @@ With drift estimation enabled it should be possible to take a reasonably sharp s
 - Dwell time: {humanize.naturaldelta(survey_dwell_time, minimum_unit='microseconds')}
 - Duration {humanize.naturaldelta(survey_dwell_time * np.prod(simulator.survey.shape), minimum_unit='microseconds')}
 
-## Scan"""),
+## Scan""", margin=(2, 5)),
             scan_step_input,
             dwell_time_input,
             sum_stack_input,
@@ -630,7 +632,7 @@ With drift estimation enabled it should be possible to take a reasonably sharp s
                 width_policy="max",
             ),
             scan_info_md,
-            pn.pane.Markdown(object="## Drift correction"),
+            pn.pane.Markdown(object="## Drift correction", margin=(2, 5)),
             estimate_drift_button,
             estimate_correction_button,
             reset_drift_btn,
