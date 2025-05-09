@@ -2,7 +2,8 @@ import numpy as np
 import panel as pn
 from itertools import pairwise
 import humanize
-from bokeh.models import LinearAxis, Range1d, Legend, LegendItem
+from bokeh.core.properties import value as bkvalue
+from bokeh.models import LinearAxis, Range1d, Legend, LegendItem, Text
 from bokeh.plotting import figure
 from skimage.registration import phase_cross_correlation
 pn.extension("floatpanel")
@@ -121,6 +122,9 @@ def simulator_ui(simulator: STEMImageSimulator):
     rectangles.rectangles.fill_color = "DarkRed"
     rectangles.rectangles.line_color = "DarkRed"
 
+    scan_text = Text(x="cx", y="cy", text=bkvalue("Scan ROI"), text_color="DarkRed", text_align="center", text_baseline="middle")
+    survey_fig.fig.add_glyph(rectangles.cds, scan_text)
+
     tools = rectangles.tools("rectangles", survey_fig.fig)
     tools[survey_fig.fig][0].num_objects = 1
 
@@ -133,6 +137,9 @@ def simulator_ui(simulator: STEMImageSimulator):
     corrected_rectangles.rectangles.fill_color = "DarkOrange"
     corrected_rectangles.rectangles.fill_alpha = 0.1
     corrected_rectangles.rectangles.line_color = "DarkOrange"
+
+    corrected_text = Text(x="cx", y="cy", text=bkvalue("Corrected"), text_color="DarkOrange", text_align="center", text_baseline="middle")
+    survey_fig.fig.add_glyph(corrected_rectangles.cds, corrected_text)
 
     drift_roi = (
         Rectangles
@@ -147,14 +154,17 @@ def simulator_ui(simulator: STEMImageSimulator):
     drift_roi.rectangles.fill_color = "CornflowerBlue"
     drift_roi.rectangles.line_color = "CornflowerBlue"
 
+    drift_text = Text(x="cx", y="cy", text=bkvalue("Drift ROI"), text_color="CornflowerBlue", text_align="center", text_baseline="middle")
+    survey_fig.fig.add_glyph(drift_roi.cds, drift_text)
+
     tools = drift_roi.tools("rectangles", survey_fig.fig)
     tools[survey_fig.fig][0].num_objects = 1
 
     estimate_drift_button = pn.widgets.Toggle(
-        name="Estimate drift",
+        name="Enable drift estimation",
         value=False,
         width_policy="max",
-        button_type="success",
+        button_type="default",
     )
     drift_estimator = DriftEstimator()
 
@@ -221,6 +231,7 @@ def simulator_ui(simulator: STEMImageSimulator):
         color="success",
     )
 
+
     def update_survey(*e):
         try:
             survey_spinner.value = True
@@ -253,7 +264,7 @@ def simulator_ui(simulator: STEMImageSimulator):
 
     update_cb = pn.state.add_periodic_callback(
         update_survey,
-        period=3000,
+        period=1000,
         start=False,
     )
 
@@ -308,7 +319,7 @@ def simulator_ui(simulator: STEMImageSimulator):
         button_type="success",
         width_policy="max",
     )
-    live_survey_button.jslink(scan_button, **{"value": "disabled"})
+    # live_survey_button.jslink(scan_button, **{"value": "disabled"})
     scan_spinner = pn.indicators.LoadingSpinner(
         value=False,
         width=35,
@@ -317,15 +328,18 @@ def simulator_ui(simulator: STEMImageSimulator):
         color="success",
     )
 
+
     def do_scan(*e):
         data = rectangles.cds.data
         if len(data["cx"]) == 0:
             return
+        if estimate_drift_button.value and len(corrected_rectangles.cds.data["cx"]) > 0:
+            data = corrected_rectangles.cds.data
         try:
             scan_button.disabled = True
             scan_spinner.value = True
-            live_survey_button.disabled = True
-            single_survey.disabled = True
+            # live_survey_button.disabled = True
+            # single_survey.disabled = True
             cx, cy = data["cx"][0], data["cy"][0]
             w, h = abs(data["w"][0]), abs(data["h"][0])
 
@@ -344,8 +358,8 @@ def simulator_ui(simulator: STEMImageSimulator):
         finally:
             scan_button.disabled = False
             scan_spinner.value = False
-            live_survey_button.disabled = False
-            single_survey.disabled = False
+            # live_survey_button.disabled = False
+            # single_survey.disabled = False
 
     scan_button.on_click(do_scan)
 
@@ -360,7 +374,6 @@ def simulator_ui(simulator: STEMImageSimulator):
 
 No ROI defined
 """
-        # cx, cy = data["cx"][0], data["cy"][0]
         w, h = abs(data["w"][0]), abs(data["h"][0])        
         extent = YX(h, w) * simulator.survey.scaling
         scan_step = float(scan_step_input.value)
@@ -388,14 +401,25 @@ No ROI defined
     dwell_time_input.param.watch(_update_md, "value")
     rectangles.cds.on_change("data", _update_md_bk)
 
-    def reset_drift(*e):
+    def reset_drift(*e, copy_correction=True):
         drift_estimator.reset()
+        if copy_correction:
+            if len(corrected_rectangles.cds.data["cx"]) > 0:
+                rectangles.cds.data.update(
+                    **corrected_rectangles.cds.data,
+                )
         corrected_rectangles.clear()
 
     def _clear_corrected(attr, old, new):
-        reset_drift()
+        reset_drift(copy_correction=False)
 
     rectangles.cds.on_change("data", _clear_corrected)
+
+    def reset_if_false(e):
+        if not e.new:
+            reset_drift()
+
+    estimate_drift_button.param.watch(reset_if_false, "value")
 
     reset_drift_btn = pn.widgets.Button(
         name="Reset drift history",
@@ -403,6 +427,19 @@ No ROI defined
         width_policy="max",
     )
     reset_drift_btn.on_click(reset_drift)
+
+    tabs_left = pn.Tabs(
+        ('Survey', survey_fig.layout),
+        closable=False,
+        dynamic=False,
+    )
+
+    tabs_right = pn.Tabs(
+        ('Scan', scan_fig.layout),
+        ('Drift', drift_fig_pane),
+        closable=False,
+        dynamic=False,
+    )
 
     return pn.template.BootstrapTemplate(
         title="STEM Image Simulator",
@@ -430,14 +467,13 @@ No ROI defined
             ),
             scan_info_md,
             pn.pane.Markdown(object="## Drift correction"),
-            reset_drift_btn,
             estimate_drift_button,
+            reset_drift_btn,
         ],
         main=[
             pn.Row(
-                survey_fig.layout,
-                scan_fig.layout,
+                tabs_left,
+                tabs_right,
             ),
-            drift_fig_pane,
         ],
     )
