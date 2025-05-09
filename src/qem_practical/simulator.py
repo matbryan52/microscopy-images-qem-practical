@@ -536,8 +536,11 @@ class STEMImageSimulator:
         if not is_stack:
             image = signals[0]
         else:
-            image = hs.stack(signals, new_axis_name="time", show_progressbar=False)
-            image.metadata.scan_end = signals[-1].metadata.scan_end
+            stack_data = np.stack(tuple(s.data for s in signals), axis=0)
+            image = Signal2D(
+                stack_data,
+                metadata=dict(signals[0].metadata),
+            )
             image.axes_manager.set_axis(
                 DataAxis(
                     name="time",
@@ -545,8 +548,17 @@ class STEMImageSimulator:
                     axis=[s.metadata.scan_start.magnitude for s in signals],
                     navigate=True,
                 ),
-                image.axes_manager["time"].index,
+                0,
             )
+            image.axes_manager.set_axis(
+                signals[0].axes_manager["y"],
+                1,
+            )
+            image.axes_manager.set_axis(
+                signals[0].axes_manager["x"],
+                2,
+            )
+            image.metadata.scan_end = signals[-1].metadata.scan_end
         if drift_corrector is not None:
             true_tl = YX(
                 np.asarray([s.axes_manager["y"].offset for s in signals]),
