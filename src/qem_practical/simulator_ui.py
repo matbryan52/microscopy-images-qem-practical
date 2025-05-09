@@ -64,7 +64,7 @@ class DriftEstimator:
         scale = survey.axes_manager["x"].scale
         if len(roi_data["cx"]) > 0:
             cx, cy = int(roi_data["cx"][0]), int(roi_data["cy"][0])
-            w, h = abs(roi_data["w"][0]), abs(roi_data["h"][0])
+            w, h = int(abs(roi_data["w"][0])), int(abs(roi_data["h"][0]))
             w2, h2 = w // 2, h // 2
             roi_slice = np.s_[cy - h2: cy + h2 + 1, cx - w2: cx + w2 + 1]
             drift_roi = survey.data[roi_slice]
@@ -129,6 +129,9 @@ def simulator_ui(simulator: STEMImageSimulator):
         )
     )
 
+    h, w = survey.shape
+    survey_fig.fig.x_range.bounds = (0, w)
+    survey_fig.fig.y_range.bounds = (0, h)
     add_cal_axes(survey_fig.fig, simulator.survey.extent, "Survey (nm)")
 
     rectangles = (
@@ -493,9 +496,49 @@ No ROI defined
         dynamic=False,
     )
 
-    return pn.template.BootstrapTemplate(
+    doc_md = pn.pane.Markdown(
+        object="""# STEM Imaging Simulator
+
+Use the controls in the sidebar to launch STEM scans with the displayed parameters
+
+## Survey
+
+The "Survey" scan gives a fixed size overview of the sample
+- A "Live" survey automatically re-scans every 1-2 seconds
+
+## Scan
+
+A true scan area can be defined using a scan ROI drawn on the survey image
+- Right-click the image and select the first "Box Edit Tool" in the dropdown menu
+- Long-press the image to start drawing an ROI, long-press again to stop drawing
+- To adjust an ROI it is necessary to select the tool again, then drag or re-draw it
+
+Scans parameters are displayed in the sidebar, note that a scan takes the real amount of time displayed plus additional overhead.
+
+## Drift
+
+The microscope suffers from stage drift, but is equipped with drift correction
+- Use the second "Box Edit Tool" to define a fixed wide-field drift estimation ROI
+- Enable drift estimation in the sidebar
+- Each new survey image will update the drift model
+- View the behaviour of the estimation in the "Drift" tab of the right plot
+- The correction is applied to the Scan according to the toggle
+- Reset the drift history if the estimation diverges
+- Adjusting the Drift ROI or Scan ROI resets the drift estimation
+
+With drift estimation enabled it should be possible to take a reasonably sharp stacked Scan.
+"""
+    )
+    modal_btn = pn.widgets.Button(
+        name="Help",
+        button_type="primary",
+        width_policy="max",
+    )
+
+    layout = pn.template.BootstrapTemplate(
         title="STEM Image Simulator",
         sidebar=[
+            modal_btn,
             pn.pane.Markdown(object="## Survey"),
             pn.Row(
                 live_survey_button,
@@ -531,4 +574,7 @@ No ROI defined
                 tabs_right,
             ),
         ],
+        modal=[doc_md],
     )
+    modal_btn.on_click(lambda e: layout.open_modal())
+    return layout
