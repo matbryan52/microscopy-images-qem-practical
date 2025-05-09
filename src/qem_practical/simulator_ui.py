@@ -1,5 +1,7 @@
 import numpy as np
 import panel as pn
+import sys
+import asyncio
 from itertools import pairwise
 import humanize
 from bokeh.core.properties import value as bkvalue
@@ -595,11 +597,16 @@ With drift estimation enabled it should be possible to take a reasonably sharp s
         button_type="primary",
         width_policy="max",
     )
+    shutdown_btn = pn.widgets.Button(
+        name="Shutdown",
+        button_type="danger",
+        width_policy="max",
+    )
 
     layout = pn.template.BootstrapTemplate(
         title="STEM Imaging Simulator",
         sidebar=[
-            modal_btn,
+            pn.Row(modal_btn, shutdown_btn, width_policy="max"),
             pn.pane.Markdown(object="## Survey"),
             pn.Row(
                 live_survey_button,
@@ -643,4 +650,26 @@ With drift estimation enabled it should be possible to take a reasonably sharp s
         modal=[doc_md],
     )
     modal_btn.on_click(lambda e: layout.open_modal())
+
+    async def _shutdown(*e):
+        try:
+            update_cb.stop()
+            with pn.io.document.hold():
+                modal_btn.disabled = True
+                shutdown_btn.disabled = True
+                live_survey_button.disabled = True
+                single_survey.disabled = True
+                scan_button.disabled = True
+                estimate_drift_button.disabled = True
+                estimate_correction_button.disabled = True
+                reset_drift_btn.disabled = True
+                layout.main[0].clear()
+            await asyncio.sleep(0.2)
+        finally:
+            pn.state.kill_all_servers()
+            sys.exit(0)
+
+
+    shutdown_btn.on_click(_shutdown)
+
     return layout
