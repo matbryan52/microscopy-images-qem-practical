@@ -509,6 +509,41 @@ No ROI defined
     )
     reset_drift_btn.on_click(reset_drift)
 
+    current_slider = pn.widgets.FloatSlider(
+        name="Current (pA)", value=simulator._current,
+        start=0.1, end=5., step=0.1,
+        width_policy="max",
+        max_width=300,
+    )
+
+    def _set_current(*e):
+        simulator._current = current_slider.value
+    
+    current_slider.param.watch(_set_current, "value")
+
+    defocus_slider = pn.widgets.FloatSlider(
+        name="Focus", value=0.,
+        start=-2., end=2., step=0.1,
+        width_policy="max",
+        max_width=300,
+    )
+
+    def _set_defocus(*e):
+        simulator._defocus = abs(defocus_slider.value)
+    
+    defocus_slider.param.watch(_set_defocus, "value")
+
+    reset_defocus = pn.widgets.Button(
+        name="Reset",
+        button_type="warning",
+        width=80,
+    )
+
+    def _reset_defocus(*e):
+        defocus_slider.value = 0
+    
+    reset_defocus.on_click(_reset_defocus)
+
     tabs_left = pn.Tabs(
         ('Survey', survey_fig.layout),
         closable=False,
@@ -597,7 +632,12 @@ With drift estimation enabled it should be possible to take a reasonably sharp s
         main=[
             pn.Row(
                 tabs_left,
-                tabs_right,
+                pn.Column(
+                    tabs_right,
+                    pn.pane.Markdown(object="## Microscope Controls"),
+                    current_slider,
+                    pn.Row(defocus_slider, reset_defocus, width_policy="max"),
+                ),
             ),
         ],
         modal=[doc_md],
