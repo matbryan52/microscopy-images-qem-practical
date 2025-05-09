@@ -37,7 +37,7 @@ class DriftEstimator:
         self._current_drift = np.asarray((0., 0.))  # in pixels
         self._last_roi = None
         self._last_roi_slice = None
-        self._drift_history = {"xvals": [0.], "yvals": [0.], "timestamp": [None]}
+        self._drift_history = {"xvals": [0.], "yvals": [0.], "timestamp": [0.]}
 
     def estimate(self, survey, rectangles):
         roi_data = rectangles.cds.data
@@ -301,6 +301,15 @@ def simulator_ui(simulator: STEMImageSimulator):
         width_policy="max",
     )
 
+    sum_stack_input = pn.widgets.Select(
+        name="Stack-depth (summed)",
+        value="1",
+        options=[
+            "1", "2", "4", "8",
+        ],
+        width_policy="max",
+    )
+
     scan_shape = (64, 64)
     scan = np.zeros(scan_shape, dtype=np.float32)
     scan_fig = (
@@ -347,11 +356,15 @@ def simulator_ui(simulator: STEMImageSimulator):
             scan_step = float(scan_step_input.value)
             scan_shape = (extent / scan_step).to_int()
             dwell_time = float(dwell_time_input.value) * 1e-6
+
+            stack = int(sum_stack_input.value)
+            stack = None if stack == 1 else stack
             scan_img = simulator.scan(
                 simulator.survey.to_continuous(YX(cy, cx)), scan_shape, scan_step, dwell_time,
-                rotation=0, progress=False,
+                rotation=0, progress=False, stack=stack,
             ).data
-
+            if stack is not None:
+                scan_img = scan_img.sum(axis=0)
             update_cal_axes(scan_fig.fig, extent)
             set_frame_height(scan_fig.fig, scan_img.shape, maxdim=MAXDIM)
             scan_fig.update(scan_img.astype(np.float32))
@@ -379,7 +392,7 @@ No ROI defined
         scan_step = float(scan_step_input.value)
         scan_shape = (extent / scan_step).to_int()
         dwell_time = float(dwell_time_input.value) * 1e-6
-        scan_time = np.prod(scan_shape) * dwell_time
+        scan_time = np.prod(scan_shape) * dwell_time * int(sum_stack_input.value)
         return stub + f"""
 
 - Shape: {scan_shape[0]} x {scan_shape[1]} px
@@ -399,6 +412,7 @@ No ROI defined
 
     scan_step_input.param.watch(_update_md, "value")
     dwell_time_input.param.watch(_update_md, "value")
+    sum_stack_input.param.watch(_update_md, "value")
     rectangles.cds.on_change("data", _update_md_bk)
 
     def reset_drift(*e, copy_correction=True):
@@ -460,6 +474,7 @@ No ROI defined
 ## Scan"""),
             scan_step_input,
             dwell_time_input,
+            sum_stack_input,
             pn.Row(
                 scan_button,
                 scan_spinner,
