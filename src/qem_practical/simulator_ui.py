@@ -186,6 +186,12 @@ def simulator_ui(simulator: STEMImageSimulator):
         width_policy="max",
         button_type="default",
     )
+    estimate_correction_button = pn.widgets.Toggle(
+        name="Enable correction",
+        value=True,
+        width_policy="max",
+        button_type="default",
+    )
     drift_estimator = DriftEstimator()
 
     drift_fig = figure(title='Drift', match_aspect=True)
@@ -373,7 +379,7 @@ def simulator_ui(simulator: STEMImageSimulator):
         data = rectangles.cds.data
         if len(data["cx"]) == 0:
             return
-        if estimate_drift_button.value and len(corrected_rectangles.cds.data["cx"]) > 0:
+        if estimate_drift_button.value and estimate_correction_button.value and len(corrected_rectangles.cds.data["cx"]) > 0:
             data = corrected_rectangles.cds.data
         try:
             scan_button.disabled = True
@@ -515,6 +521,7 @@ No ROI defined
             scan_info_md,
             pn.pane.Markdown(object="## Drift correction"),
             estimate_drift_button,
+            estimate_correction_button,
             reset_drift_btn,
             drift_info_md,
         ],
