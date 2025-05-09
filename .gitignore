@@ -186,3 +186,4 @@ node_modules/
 *.npy
 
 solution.ipynb
+doc/_build

@@ -147,6 +147,41 @@ class ScanDef(NamedTuple):
 
 
 class STEMImageSimulator:
+    """
+    A simulator for STEM imaging with stage drift and focus error
+
+    Should normally be created with :py:meth:`~qem_practical.simulator.STEMImageSimulator.default`
+    which automatically sets the `data` and `extent` parameters.
+
+    Uses `HyperSpy <https://hyperspy.org/hyperspy-doc/current/index.html>`_ for image
+    results, notably `Signal2D <https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D>`_.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        The high-resolution 2D data to sample from, scaled from 0..1,
+        nominally denoting a "scattering factor" for ADF imaging.
+    extent : NanoMetreShapeYX
+        The size of the data as a tuple `(y, x)`, nominally in nm
+    current : PicoAmps, optional
+        The beam current, by default 1, nominally in pico-amps
+    drift_speed : NMPerSecond | Literal["random"], optional
+        The drift rate of the sample, by default "random", in which case
+        a sensible drift rate will be chosen, else a positive float in nm/s
+    defocus : NanoMetres, optional
+        A focus error on the sample plane, which is used to crudely
+        simulate blurry imaging, by default 0.
+
+    Example
+    --------
+
+    >>> from qem_practical.simulator import STEMImageSimulator
+    >>> simulator = STEMImageSimulator.default()
+    >>> survey_image = simulator.survey_image(1e-6)
+    >>> scan = simulator.scan((12.3, 20.6), (64, 64), 1e-10)
+
+    >>> simulator.show()  # launch the web-ui for this simulator
+    """
     def __init__(
         self,
         data: np.ndarray,
@@ -190,7 +225,10 @@ class STEMImageSimulator:
         current: PicoAmps = 1,
         drift_speed: NMPerSecond | Literal["random"] = "random",
         defocus: NanoMetres = 0.,
-    ):
+    ) -> 'STEMImageSimulator':
+        """
+        Create a :class:`STEMImageSimulator` with the default nanoparticle data
+        """
         rootdir = pathlib.Path(__file__).parent.parent.parent
         sim_data = np.load(rootdir / "data" / "particles.npz")
         return cls(
@@ -228,13 +266,15 @@ class STEMImageSimulator:
 
         Parameters
         ----------
+
         times : Sequence[Seconds]
             Timestamps of images returned by this simulator, available as
-            `signal.metadata.scan_start.magnitude` or as `signal.axes_metadata["time"].axis`
+            :code:`signal.metadata.scan_start.magnitude` or as :code:`signal.axes_metadata["time"].axis`
             for an image stack
 
         Returns
         -------
+
         pd.DataFrame
             A dataframe of absolute drift values with columns "timestamp", "yvals"
             and "xvals" in nanometres. Note the drifts are relative to `t==0` and so
@@ -446,7 +486,7 @@ class STEMImageSimulator:
         """
         return self._survey_def
 
-    def survey_image(self, dwell_time: Seconds, progress: bool = True):
+    def survey_image(self, dwell_time: Seconds, progress: bool = True) -> Signal2D:
         """
         Acquire a new survey image with the given dwell time
         """
@@ -484,6 +524,7 @@ class STEMImageSimulator:
 
         Parameters
         ----------
+
         centre : NanoMetreYX
             The center of the scan grid in continuous survey coordinates.
         scan_shape : PixelShapeYX
@@ -497,7 +538,7 @@ class STEMImageSimulator:
             scan coordinates (default is None)
         drift_corrector : Callable[[Seconds], NanoMetreYX], optional
             A function which takes the timestamp of the start of the scan
-            being run and returns a displacement of `centre`, `(dy, dx)`,
+            being run and returns a displacement of :code:`centre`, :code:`(dy, dx)`,
             in nanometres to nominally correct drift. This function will be
             called just before the start of each scan when acquiring a `stack`.
         rotation : Degrees, optional
@@ -509,6 +550,7 @@ class STEMImageSimulator:
 
         Returns
         -------
+
         image : Signal2D
             The acquired scan image as a HyperSpy `Signal2D` with calibration and metadata.
             If `stack` is not None then the returned image will have an additional navigation
@@ -518,6 +560,7 @@ class STEMImageSimulator:
 
         Notes
         -----
+
         The returned grid, if requested, is relative to the survey's top-left origin.
         """
         centre = YX(*centre)
@@ -593,6 +636,9 @@ class STEMImageSimulator:
         return image
 
     def show(self):
+        """
+        Launch the GUI webapp for this simulator
+        """
         from .simulator_ui import simulator_ui
         simulator_ui(self).show(
             title="STEM Image Simulator",
