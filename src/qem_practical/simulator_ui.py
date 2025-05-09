@@ -5,6 +5,7 @@ import humanize
 from bokeh.core.properties import value as bkvalue
 from bokeh.models import LinearAxis, Range1d, Legend, LegendItem, Text
 from bokeh.plotting import figure
+from sklearn import linear_model
 from skimage.registration import phase_cross_correlation
 pn.extension("floatpanel")
 
@@ -90,6 +91,26 @@ class DriftEstimator:
             self._last_roi = drift_roi
             self._last_roi_slice = roi_slice
         return self._current_drift  # in pixels
+
+    @property
+    def can_predict(self) -> bool:
+        yvals = self._drift_history["yvals"]
+        if len(yvals) < 2:
+            return False
+        return True
+
+    def predict(self, time):
+        if not self.can_predict:
+            return YX(0., 0.)
+        pts = 10
+        yvals = np.asarray(self._drift_history["yvals"][-pts:])
+        xvals = np.asarray(self._drift_history["xvals"][-pts:])
+        timestamps = np.asarray(self._drift_history["timestamp"][-pts:])        
+        reg = linear_model.LinearRegression()
+        shifts_nm = np.stack((yvals, xvals), axis=1)
+        reg.fit(timestamps.reshape(-1, 1), shifts_nm)
+        dy, dx = reg.predict(np.array([[time]])).squeeze()
+        return YX(dy, dx)
 
 
 def add_cal_axes(fig, extent, label):
@@ -382,8 +403,13 @@ def simulator_ui(simulator: STEMImageSimulator):
         data = rectangles.cds.data
         if len(data["cx"]) == 0:
             return
-        if estimate_drift_button.value and estimate_correction_button.value and len(corrected_rectangles.cds.data["cx"]) > 0:
-            data = corrected_rectangles.cds.data
+        corrector = None
+        if (
+            estimate_drift_button.value
+            and estimate_correction_button.value
+            and drift_estimator.can_predict
+        ):
+            corrector = drift_estimator.predict
         try:
             scan_button.disabled = True
             scan_spinner.value = True
@@ -401,7 +427,7 @@ def simulator_ui(simulator: STEMImageSimulator):
             stack = None if stack == 1 else stack
             scan_img = simulator.scan(
                 simulator.survey.to_continuous(YX(cy, cx)), scan_shape, scan_step, dwell_time,
-                rotation=0, progress=False, stack=stack,
+                rotation=0, progress=False, stack=stack, drift_corrector=corrector,
             ).data
             if stack is not None:
                 scan_img = scan_img.sum(axis=0)
@@ -536,7 +562,7 @@ With drift estimation enabled it should be possible to take a reasonably sharp s
     )
 
     layout = pn.template.BootstrapTemplate(
-        title="STEM Image Simulator",
+        title="STEM Imaging Simulator",
         sidebar=[
             modal_btn,
             pn.pane.Markdown(object="## Survey"),
