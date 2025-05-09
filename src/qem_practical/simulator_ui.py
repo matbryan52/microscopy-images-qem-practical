@@ -39,6 +39,26 @@ class DriftEstimator:
         self._last_roi_slice = None
         self._drift_history = {"xvals": [0.], "yvals": [0.], "timestamp": [0.]}
 
+    def current_drift_nm(self):
+        dy, dx = self._drift_history["yvals"][-1], self._drift_history["xvals"][-1]
+        return YX(dy, dx)
+
+    def current_drift_rate(self, pts: int = 10):
+        yvals = np.asarray(self._drift_history["yvals"][-pts:])
+        if yvals.size <= 1:
+            return None
+        xvals = np.asarray(self._drift_history["xvals"][-pts:])
+        timestamps = np.asarray(self._drift_history["timestamp"][-pts:])
+
+        cvals = xvals + 1j * yvals
+        b = np.cumsum(np.abs(np.diff(cvals))).reshape(-1, 1)
+        timestamps = timestamps[1:]
+        A = np.stack((timestamps, np.ones(timestamps.size)), axis=1)
+        m, _ = np.linalg.lstsq(
+            A, b,
+        )[0]
+        return m.item()  # nm / s        
+
     def estimate(self, survey, rectangles):
         roi_data = rectangles.cds.data
         scale = survey.axes_manager["x"].scale
@@ -231,6 +251,16 @@ def simulator_ui(simulator: STEMImageSimulator):
         color="success",
     )
 
+    drift_info_md = pn.pane.Markdown(object="No drift information")
+
+    def _format_drift_info():
+        drift_yx = drift_estimator.current_drift_nm()
+        drift_rate = drift_estimator.current_drift_rate()
+        if drift_rate is None:
+            drift_rate = 0.
+        return f"""- **Current drift**: (x, y) = {drift_yx.x:.1f}, {drift_yx.y:.1f} *nm*
+- **Drift rate**: {drift_rate:.1f} *nm / s*
+"""
 
     def update_survey(*e):
         try:
@@ -259,6 +289,7 @@ def simulator_ui(simulator: STEMImageSimulator):
                         w=scan_roi["w"],
                         h=scan_roi["h"],
                     )
+                drift_info_md.object = _format_drift_info()
         finally:
             survey_spinner.value = False
 
@@ -423,6 +454,7 @@ No ROI defined
                     **corrected_rectangles.cds.data,
                 )
         corrected_rectangles.clear()
+        drift_info_md.object = "No drift information"
 
     def _clear_corrected(attr, old, new):
         reset_drift(copy_correction=False)
@@ -484,6 +516,7 @@ No ROI defined
             pn.pane.Markdown(object="## Drift correction"),
             estimate_drift_button,
             reset_drift_btn,
+            drift_info_md,
         ],
         main=[
             pn.Row(
