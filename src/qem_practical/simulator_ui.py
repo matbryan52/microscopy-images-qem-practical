@@ -139,10 +139,10 @@ def simulator_ui(simulator: STEMImageSimulator):
         .editable(selected=True)
     )
 
-    rectangles.rectangles.fill_color = "DarkRed"
-    rectangles.rectangles.line_color = "DarkRed"
+    rectangles.rectangles.fill_color = "Crimson"
+    rectangles.rectangles.line_color = "Crimson"
 
-    scan_text = Text(x="cx", y="cy", text=bkvalue("Scan ROI"), text_color="DarkRed", text_align="center", text_baseline="middle")
+    scan_text = Text(x="cx", y="cy", text=bkvalue("Scan ROI"), text_color="Crimson", text_align="center", text_baseline="middle")
     survey_fig.fig.add_glyph(rectangles.cds, scan_text)
 
     tools = rectangles.tools("rectangles", survey_fig.fig)
