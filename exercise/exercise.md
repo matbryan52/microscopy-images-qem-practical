@@ -188,6 +188,14 @@ Such a function would need to be created from a sequence of drift-measurement ac
   - Sum an uncorrected stack and a corrected stack to see if the detail improves
   - Generate a GIF of the scan images using `imageio.v3.imwrite`
 
+### Extension: Kalman Filter
+
+A Kalman filter is a statistical technique to estimate both the tendency and noise in a time-series of measurements. It is often used in motion tracking and prediction tools, for example in GPS software. Try to implement a Kalman filter to smooth and better-predict the drift of the sample.
+
+### GPU Implementation
+
+Look into the `cupy` Python library and see if you can write the Python code to do drift estimation using the GPU.
+
 ## Notes and hints
 
 HyperSpy can handle more than just spectra; it has a number of image processing features which will **very** be useful for the exercises. Consider reading the user guide of [Signal2D](https://hyperspy.org/hyperspy-doc/current/user_guide/signal2d.html) and its [documentation](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D).
