@@ -38,8 +38,7 @@ The simulator reproduces ADF-STEM imaging on a sample of nanoparticles which are
 import numpy as np
 from qem_practical.simulator import STEMImageSimulator
 
-sim_data = np.load("data/particles.npz")
-simulator = STEMImageSimulator(**sim_data)
+simulator = STEMImageSimulator.default(drift_speed=0.)
 ```
 
 The simulator object has two primary user-facing methods, one to acquire a survey image:
@@ -72,7 +71,7 @@ where `scan_image` is a [HyperSpy](https://hyperspy.org/hyperspy-doc/current/use
 The output `Signal2D` images are calibrated to the coordinate system of the simulator:
 
 ```python-repl
->>> survey.axes_manager
+>>> survey_image.axes_manager
 <Axes manager, axes: (|512, 512)>
             Name |   size |  index |  offset |   scale |  units
 ================ | ====== | ====== | ======= | ======= | ======
@@ -126,13 +125,17 @@ scan_end = <Quantity(2.62452228, 'second')>
 scan_start = <Quantity(0.00308227539, 'second')>
 ```
 
-There is also a UI version of the simulator which will launch in a web browser with:
+There is also a UI version of the simulator which will launch in a web browser with, but this is only for demonstration purposes, not the coding exercise:
 
 ```python
 simulator.show()
 ```
 
 ![image](./ui.png)
+
+## Notes and hints
+
+HyperSpy can handle more than just spectra; it has a number of image processing features which will **very** be useful for the exercises. Consider reading the user guide of [Signal2D](https://hyperspy.org/hyperspy-doc/current/user_guide/signal2d.html) and its [documentation](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D).
 
 ## Exercises
 
@@ -195,7 +198,3 @@ A Kalman filter is a statistical technique to estimate both the tendency and noi
 ### GPU Implementation
 
 Look into the `cupy` Python library and see if you can write the Python code to do drift estimation using the GPU.
-
-## Notes and hints
-
-HyperSpy can handle more than just spectra; it has a number of image processing features which will **very** be useful for the exercises. Consider reading the user guide of [Signal2D](https://hyperspy.org/hyperspy-doc/current/user_guide/signal2d.html) and its [documentation](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D).
