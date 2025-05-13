@@ -24,6 +24,16 @@ You can then update the course materials using:
 tp-update
 ```
 
+To open a Jupyter Notebook, within the terminal type:
+
+```powershell
+jupyter lab
+```
+
+or you can use Python or notebooks from VSCode.
+
+If you go via Anaconda Navigator, be sure that the `TP_AI` environment is activated.
+
 ## Objective
 
 The objective is to carry out STEM imaging measurements of a sample of gold nanoparticles using on a simulated microscope suffering from severe sample drift. Imaging quickly to mitigate the drift leads to poor signal-to-noise ratio images, while slowy scanning too large an area adds distortion as the sample drifts during a scan.
@@ -67,6 +77,8 @@ where `scan_image` is a [HyperSpy](https://hyperspy.org/hyperspy-doc/current/use
 `Signal2D` of size `scan_shape` scanned around `centre`.
 
 ![image](./scan.png)
+
+NOTE: the dwell time is a real
 
 The output `Signal2D` images are calibrated to the coordinate system of the simulator:
 
@@ -136,6 +148,8 @@ simulator.show()
 ## Notes and hints
 
 HyperSpy can handle more than just spectra; it has a number of image processing features which will **very** be useful for the exercises. Consider reading the user guide of [Signal2D](https://hyperspy.org/hyperspy-doc/current/user_guide/signal2d.html) and its [documentation](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D).
+
+However, take care with HyperSpy's interactive mode, it can show false results in interactive figures.
 
 ## Exercises
 
