@@ -34,6 +34,8 @@ or you can use Python or notebooks from VSCode.
 
 If you go via Anaconda Navigator, be sure that the `TP_AI` environment is activated.
 
+**NOTE**: If you have red `UserWarning` about missing `CUDA_PATH`, do not worry, this does not stop the simulator from working.
+
 ## Objective
 
 The objective is to carry out STEM imaging measurements of a sample of gold nanoparticles using on a simulated microscope suffering from severe sample drift. Imaging quickly to mitigate the drift leads to poor signal-to-noise ratio images, while slowy scanning too large an area adds distortion as the sample drifts during a scan.
