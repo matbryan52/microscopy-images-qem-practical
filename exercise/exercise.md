@@ -30,13 +30,11 @@ To open a Jupyter Notebook, within the terminal type:
 jupyter lab
 ```
 
-or you can use Python or notebooks from VSCode.
+or you can use Python or notebooks from VSCode directly. Just be sure that `TP_AI` is displayed in the terminal or VSCode interface. Same for Anaconda Navigator.
 
-If you go via Anaconda Navigator, be sure that the `TP_AI` environment is activated.
+### Juypter interactive figures
 
-**NOTE**: If you have red `UserWarning` about missing `CUDA_PATH`, do not worry, this does not stop the simulator from working.
-
-**NOTE**: To have HyperSpy figures be interactive, add the following to a cell in you notebook and run it:
+To have HyperSpy figures be interactive, add the following to a cell at the top of your notebook and run it:
 
 ```python
 %matplotlib widget
@@ -44,20 +42,19 @@ If you go via Anaconda Navigator, be sure that the `TP_AI` environment is activa
 
 ## Objective
 
-The objective is to carry out STEM imaging measurements of a sample of gold nanoparticles using on a simulated microscope suffering from severe sample drift. Imaging quickly to mitigate the drift leads to poor signal-to-noise ratio images, while slowy scanning too large an area adds distortion as the sample drifts during a scan.
-
-There are multiple approaches to measure the particles and acquire enough data to display a particle size distribution.
+The objective is to carry out STEM imaging measurements (radius, area etc.) of a sample of gold nanoparticles using a simulated microscope. The simulated microscope in its default state has a drifting stage, so we cannot use the survey image to identify where to run a high-resolution scan, be cause the particle will move outside the field of view by the time we run it.
 
 ## Simulator
 
 The simulator reproduces ADF-STEM imaging on a sample of nanoparticles which are drifting through the field of view. The simulator can be created like so:
 
 ```python
-import numpy as np
 from qem_practical.simulator import STEMImageSimulator
 
-simulator = STEMImageSimulator.default(drift_speed=0.)
+simulator = STEMImageSimulator.default()
 ```
+
+The `default()` method can be called with `drift_speed=0.` to completely disable drifting, as needed in exercise 1.
 
 The simulator object has two primary user-facing methods, one to acquire a survey image:
 
@@ -70,12 +67,12 @@ where `survey_image` is a `512x512` [HyperSpy](https://hyperspy.org/hyperspy-doc
 
 ![image](./survey-image.png)
 
-Ando one to acquire a STEM scan:
+The simulator can also acquire a detailed STEM scan:
 
 ```python
 scan_image = simulator.scan(
-    centre=(61.3, 34.2),  # centre of the scan grid in the coordinate system of the survey image
-    scan_shape=(100, 180),  # scan grid shape-YX (integer)
+    centre=(61.3, 34.2),  # (y, x) centre of the scan grid in the coordinate system of the survey image, in NanoMetres
+    scan_shape=(100, 180),  # (y, x) scan grid shape (integer)
     scan_step=0.1,  # scan grid stepsize in nm
     dwell_time=1e-6,
 )
@@ -86,9 +83,9 @@ where `scan_image` is a [HyperSpy](https://hyperspy.org/hyperspy-doc/current/use
 
 ![image](./scan.png)
 
-NOTE: the dwell time is a real
+**NOTE:** the dwell time is simulated *realistically*, if your request to scan will take more than 10 seconds then the simulator will require you to override a safeguard so you don't have to wait minutes for an image...
 
-The output `Signal2D` images are calibrated to the coordinate system of the simulator:
+The output `Signal2D` images are calibrated to the coordinate system of the simulator using the normal HyperSpy system detailed [here](https://hyperspy.org/hyperspy-doc/current/reference/base_classes/axes.html#hyperspy.axes.AxesManager):
 
 ```python-repl
 >>> survey_image.axes_manager
@@ -107,43 +104,51 @@ and so can be used for coordinate transformations:
 x_px = survey.axes_manager["x"].value2index(62.3)
 ```
 
-and slice into an image using continuous coordinates:
+and slice into an image using continuous coordinates (see [here](https://hyperspy.org/hyperspy-doc/current/user_guide/axes.html#the-navigation-and-signal-dimensions)):
 
 ```python
 # slice an ROI with nanometres
-survey.isig[12.3: 24.9, 38.2: 45.1]
+survey_image.isig[12.3:24.9, 38.2:45.1]
 ```
+
+**NOTE:** HyperSpy `isig` uses indexing as `(x, y)`, i.e. horizontal-vertical which is the opposite of `numpy` and matrix notation.
 
 For convenience the simulator also provides its own coordinate transformation helpers:
 
 ```python
-(ny, nx) = simulator.survey.to_continuous((py, px))  # convert from pixels to nanometres
-(py, px) = simulator.survey.to_pixels((ny, nx))  # convert from nanometres to pixels
+py, px = 32, 46
+(ny, nx) = simulator.survey.to_continuous((py, px))  # convert from (y, x) pixels to nanometres
+(py, px) = simulator.survey.to_pixels((ny, nx))  # convert from (y, x) nanometres to pixels
 (sy, sx) = simulator.survey.scaling  #  scaling of the survey field of view in nm / pixel
 (ey, ex) = simulator.survey.extent  # size of the survey field of view in nm
 ```
 
-We can also plot signals using HyperSpy:
+We can also plot our signals using HyperSpy, and use `matplotlib` to add additional annotations:
 
 ```python
 import matplotlib.pyplot as plt
+plt.figure()
 survey_image.plot()
+plt.plot(xcoord, ycoord)  # note x and y coords must be in nanometres as HyperSpy created the axes!
 plt.show()
 ```
 
 ![image](./hyperspy-plot.png)
 
-The returned `Signal2D` also contains metadata about the scan:
+The returned `Signal2D` also contains metadata about the scan for information:
 
-```python-repl
->>> survey.metadata
-title = Survey image
-current = <Quantity(1e-11, 'ampere')>
-dwell_time = <Quantity(1e-05, 'second')>
-rotation = <Quantity(0.0, 'degree')>
-scan_end = <Quantity(2.62452228, 'second')>
-scan_start = <Quantity(0.00308227539, 'second')>
+```python
+survey_image.metadata
 ```
+
+returns the following:
+
+- `title`: Survey image
+- `current`: Quantity(1e-11, 'ampere')
+- `dwell_time`: Quantity(1e-05, 'second')
+- `rotation`: Quantity(0.0, 'degree')
+- `scan_end`: Quantity(2.62452228, 'second')
+- `scan_start`: Quantity(0.00308227539, 'second')
 
 There is also a UI version of the simulator which will launch in a web browser with, but this is only for demonstration purposes, not the coding exercise:
 
@@ -157,7 +162,7 @@ simulator.show()
 
 HyperSpy can handle more than just spectra; it has a number of image processing features which will **very** be useful for the exercises. Consider reading the user guide of [Signal2D](https://hyperspy.org/hyperspy-doc/current/user_guide/signal2d.html) and its [documentation](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D).
 
-However, take care with HyperSpy's interactive mode, it can show false results in interactive figures.
+Any HyperSpy signal has a `numpy` array underneath which can be accessed using `signal.data`. This can be useful for plotting with `matplotlib` or passing signals to non-HyperSpy functions.
 
 ## Exercises
 
@@ -165,12 +170,20 @@ In order of increasing difficulty, with no obligation to complete all steps.
 
 ### 1 - Detect, image and measure particles without drift
 
-Create the simulator with argument `drift_speed=0.` to disable drifting. This means we can treat the survey image as *static* and measure any particle within the field of view without distortion or tracking.
+Create the simulator with argument `drift_speed=0.` given to `STEMImageSimulator.default()` to disable drifting. This means we can treat the survey image as *static* and measure any particle within the field of view without distortion or tracking.
 
-- From a survey image taken at a long dwell time locate all of the particles in the field of view using a peak-finding or similar approach
-- For some of the detected particles run a detailed STEM scan of each and display the high-resolution images on the same figure
-- For each high-resolution image segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity). Try to express the measurements in *nanometres* rather than pixels based on the information you have about each scan. (Hint, take a look at [`skimage.measure.regionprops`](https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops)).
-- Plot the distributions of the above values as histograms.
+- From a survey image taken at a decent dwell time (`1e-5`) locate all of the particles in the field of view using a peak-finding approach
+  - HyperSpy provides a method `signal.find_peaks()`, documented [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.find_peaks).
+  - Give the argument `interactive=False` to avoid showing the UI in the Jupyter Notebook
+  - You will need to limit the number of peaks it returns, use `min_distance=20` or more as an extra argument.
+  - The raw data for the peak positions can be found from the returned results as `peaks.data[0]`
+  - The peaks are returned as `[y, x]` positions in *pixels*.
+- For some of the detected particles run a STEM `simulator.scan()` of each and display a few of the images
+  - Remember, `simulator.scan` takes nano-metre coordinates for the centre of the scan grid. You can convert to nanometre coordinates with `simulator.survey.to_continuous((pixel_y, pixel_x))`.
+- For each detailed image use thresholding of the numbpy array (`scan_image.data`) to segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity).
+  - Take a look at [`skimage.measure.regionprops`](https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops), which can operate directly on a binary `[0, 1]` image.
+  - Try to express the measurements in *nanometres* rather than pixels based on the information you have about each scan.
+- Plot the distributions of the above values as histograms (`plt.hist`).
 
 ### 2 - Estimate the drift and correct an image stack
 

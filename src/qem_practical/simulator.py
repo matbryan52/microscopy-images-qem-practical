@@ -29,6 +29,7 @@ DRIFT_HISTORY = 60 * 10
 
 SCAN_WAIT = True
 SCAN_DEAD_TIME = 0.2
+SCAN_WARN_TIME = 15.
 
 class no_op_tqdm:
     def update(self, *args, **kwargs):
@@ -72,7 +73,7 @@ class YX(NamedTuple):
     def __sub__(self, val: float | int | Self):
         return self.__binary_op(operator.sub, val)
 
-    def __iter__(self):
+    def as_coords(self):
         if self.is_scalar():
             return iter((self,))
         return (YX(y, x) for y, x in zip(self.y, self.x))
@@ -408,6 +409,7 @@ class STEMImageSimulator:
         rotation: Degrees = 0.,
         wait: bool | str = False,
         progress: bool = True,
+        force: bool = False,
     ) -> Signal2D:
         with self._scan_lock:
             tstart = time.perf_counter()
@@ -421,6 +423,14 @@ class STEMImageSimulator:
             effective_tl = tl + self.survey.tl
             scan_end = scan_start + np.prod(shape) * dwell_time
             grid = self._get_grid(effective_tl, extent, shape, rotation)
+            npts = grid.x.size
+            true_time = npts * dwell_time
+            if true_time > SCAN_WARN_TIME and not force:
+                raise RuntimeError(
+                    f"Requested scan will take {true_time:.1f} seconds, which is "
+                    f"more than {SCAN_WARN_TIME}, pass force_scan=True to "
+                    "override this check"
+                )
             grid = self._apply_drift(grid, scan_start, dwell_time)
             has_defocus = self._defocus_value > 0.
             if has_defocus:
@@ -438,8 +448,6 @@ class STEMImageSimulator:
                 grid = YX(grid.y[::dp], grid.x[::dp])
             image = image.reshape(shape)
             tspent = time.perf_counter() - tstart
-            npts = grid.x.size
-            true_time = npts * dwell_time
             time_to_wait = max(0, (true_time - tspent))
             if wait:
                 effective_dwell_time = time_to_wait / npts
@@ -496,7 +504,12 @@ class STEMImageSimulator:
         """
         return self._survey_def
 
-    def survey_image(self, dwell_time: Seconds, progress: bool = True) -> Signal2D:
+    def survey_image(
+        self,
+        dwell_time: Seconds,
+        progress: bool = True,
+        force_scan: bool = False,
+    ) -> Signal2D:
         """
         Acquire a new survey image with the given dwell time
         """
@@ -507,6 +520,7 @@ class STEMImageSimulator:
             dwell_time=dwell_time,
             wait="Survey" if SCAN_WAIT else False,
             progress=progress,
+            force=force_scan,
         )
         image.metadata.General.title = "Survey image"
         return image
@@ -523,6 +537,7 @@ class STEMImageSimulator:
         rotation: Degrees = 0.,
         with_grid: bool = False,
         progress: bool = True,
+        force_scan: bool = False,
     ) -> Signal2D | tuple[Signal2D, YX]:
         """
         Acquire a scan image centered at a specified point.
@@ -557,6 +572,8 @@ class STEMImageSimulator:
             If True, also return the grid coordinates used in the scan (default is False).
         progress: bool, optional
             If True, display a progress bar during the scan (default is True).
+        force_scan: bool, optional
+            If True, run even if the scan time exceeds 10 seconds (default is False).
 
         Returns
         -------
@@ -598,6 +615,7 @@ class STEMImageSimulator:
                 rotation=rotation,
                 wait="Scanning" if SCAN_WAIT else False,
                 progress=progress and not is_stack,
+                force=force_scan,
             )
             image.metadata.General.title = "Scan"
             signals.append(image)
