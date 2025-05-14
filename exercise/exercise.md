@@ -161,6 +161,16 @@ HyperSpy can handle more than just spectra; it has a number of image processing 
 
 Any HyperSpy signal has a `numpy` array underneath which can be accessed using `signal.data`. This can be useful for plotting with `matplotlib` or passing signals to non-HyperSpy functions.
 
+If you need to plot something in pixel coordinates, use:
+
+```python
+plt.figure()
+plt.imshow(signal.data)
+plt.plot(x_px, y_px, "rx")  # plot some points as integer coordinates
+```
+
+In a Jupyter notebook, there is no need to use `plt.show()`.
+
 ## Exercises
 
 In order of increasing difficulty, with no obligation to complete all steps.
