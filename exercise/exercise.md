@@ -135,6 +135,8 @@ plt.show()
 
 ![image](./hyperspy-plot.png)
 
+> **NOTE:** Hyperspy displays coordinates in the plot window as `(x, y)` in nanometres, but numpy arrays are indexed `[y, x]` in pixels!
+
 The returned `Signal2D` also contains metadata about the scan for information:
 
 ```python
