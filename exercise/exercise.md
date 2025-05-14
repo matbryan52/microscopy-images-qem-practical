@@ -179,8 +179,16 @@ Create the simulator with argument `drift_speed=0.` given to `STEMImageSimulator
   - The peaks are returned as `[y, x]` positions in *pixels*.
 - For some of the detected particles run a STEM `simulator.scan()` of each and display a few of the images
   - Remember, `simulator.scan` takes nano-metre coordinates for the centre of the scan grid. You can convert to nanometre coordinates with `simulator.survey.to_continuous((pixel_y, pixel_x))`.
-- For each detailed image use thresholding of the numbpy array (`scan_image.data`) to segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity).
-  - Take a look at [`skimage.measure.regionprops`](https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops), which can operate directly on a binary `[0, 1]` image.
+- For each detailed image use thresholding of the numpy array (`scan_image.data`) to segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity).
+  - Take a look at [`skimage.measure.regionprops`](https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops), which can operate directly on a binary `[0, 1]` image. (Use `signal.data` to get the numpy array from the HyperSpy scan image).
+  - If your thresholded image contains artefacts (small dots), either increase your threshold or consider using:
+
+  ```python
+  from skimage.morphology import remove_small_objects
+  numpy_array = remove_small_objects(numpy_array, min_size=8)  # delete regions larger than 8px in size
+  ```
+  
+  to remove these before running `regionprops`.
   - Try to express the measurements in *nanometres* rather than pixels based on the information you have about each scan.
 - Plot the distributions of the above values as histograms (`plt.hist`).
 
