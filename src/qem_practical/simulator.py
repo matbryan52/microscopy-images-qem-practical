@@ -34,6 +34,9 @@ class no_op_tqdm:
     def update(self, *args, **kwargs):
         pass
 
+    def close(self, *args, **kwargs):
+        pass
+
 
 class YX(NamedTuple):
     y: float | np.ndarray
@@ -444,6 +447,8 @@ class STEMImageSimulator:
                     bar.update(min(step, npts - idx))
                     if effective_dwell_time > 0:
                         time.sleep(effective_dwell_time * step)
+                if progress:
+                    bar.close()
             else:
                 self._tstart -= time_to_wait
         scales = extent / shape
