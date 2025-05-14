@@ -46,6 +46,8 @@ The objective is to carry out STEM imaging measurements (radius, area etc.) of a
 
 ## Simulator
 
+> **NOTE:** This section demonstrates some features of the simulator and HyperSpy. It is not necessary to copy all of the code into your exercise. Go to the [Exercises](#exercises) section for the practical session content.
+
 The simulator reproduces ADF-STEM imaging on a sample of nanoparticles which are drifting through the field of view. The simulator can be created like so:
 
 ```python
@@ -83,7 +85,7 @@ where `scan_image` is a [HyperSpy](https://hyperspy.org/hyperspy-doc/current/use
 
 ![image](./scan.png)
 
-**NOTE:** the dwell time is simulated *realistically*, if your request to scan will take more than 10 seconds then the simulator will require you to override a safeguard so you don't have to wait minutes for an image...
+> **NOTE:** the dwell time is simulated *realistically*, if your request to scan will take more than 10 seconds then the simulator will require you to override a safeguard so you don't have to wait minutes for an image...
 
 The output `Signal2D` images are calibrated to the coordinate system of the simulator using the normal HyperSpy system detailed [here](https://hyperspy.org/hyperspy-doc/current/reference/base_classes/axes.html#hyperspy.axes.AxesManager):
 
@@ -97,21 +99,14 @@ The output `Signal2D` images are calibrated to the coordinate system of the simu
                y |    512 |      0 |       0 |    0.24 |     nm
 ```
 
-and so can be used for coordinate transformations:
-
-```python-repl
-# nm to pixels
-x_px = survey.axes_manager["x"].value2index(62.3)
-```
-
-and slice into an image using continuous coordinates (see [here](https://hyperspy.org/hyperspy-doc/current/user_guide/axes.html#the-navigation-and-signal-dimensions)):
+We can slice into an image using continuous coordinates (see [here](https://hyperspy.org/hyperspy-doc/current/user_guide/axes.html#the-navigation-and-signal-dimensions)):
 
 ```python
 # slice an ROI with nanometres
-survey_image.isig[12.3:24.9, 38.2:45.1]
+survey_image.isig[12.3:24.9, 38.2:45.1]  # x, y ranges in nanometres!
 ```
 
-**NOTE:** HyperSpy `isig` uses indexing as `(x, y)`, i.e. horizontal-vertical which is the opposite of `numpy` and matrix notation.
+> **NOTE:** HyperSpy `isig` uses indexing as `(x, y)`, i.e. horizontal-vertical which is the opposite of `numpy` and matrix notation.
 
 For convenience the simulator also provides its own coordinate transformation helpers:
 
@@ -170,6 +165,8 @@ Any HyperSpy signal has a `numpy` array underneath which can be accessed using `
 
 In order of increasing difficulty, with no obligation to complete all steps.
 
+For each exercise, start a new Jupyter Notebook or python script file under `TP Images/Workspace/`.
+
 ### 1 - Detect, image and measure particles without drift
 
 Create the simulator with argument `drift_speed=0.` given to `STEMImageSimulator.default()` to disable drifting. This means we can treat the survey image as *static* and measure any particle within the field of view without distortion or tracking.
@@ -191,11 +188,12 @@ Create the simulator with argument `drift_speed=0.` given to `STEMImageSimulator
 
 Create a simulator with a random drift speed `drift_speed="random"`. The survey image will now change over time as particles move through the field of view. The drift rate will be approximately constant while the drift direction slowly changes over time.
 
-- Create a survey image with a short dwell time
-- Identify or choose a cluster of particles to scan in detail
+- Create a survey image with a short dwell time (`1e-6`)
+- Identify or choose an area of particles to scan in detail
 - Scan the particles repeatedly and estimate the drift vector between successive frames
   - This can be acheived with `simulator.scan(..., stack=8)` to acquire an 8-image stack.
-- Plot the drift over time and compare it to the simulator's true drift curve that can computed with:
+  - HyperSpy provides a function `signal.estimate_shift2D()` to do this on a stack (see [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.estimate_shift2D)).
+- Plot the drift over time and compare it to the simulator's true drift curve that can accessed with:
 
 ```python
 # drift_dataframe contains columns "timestamp", "yvals", "xvals" in nanometres
@@ -203,7 +201,8 @@ timestamps = stack.axes_manager["time"].axis
 drift_dataframe = simulator.drift_for_time(timestamps)
 ```
 
-- Super-impose the acquired images using interpolation to correct for the drift
+- Super-impose the acquired images to correct for the drift
+  - HyperSpy provides a function `signal.align2D()` to do this on a stack (see [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.align2D)).
 - Display the summed image stack
 
 ### 3 - Live drift correction
