@@ -72,6 +72,11 @@ class YX(NamedTuple):
     def __sub__(self, val: float | int | Self):
         return self.__binary_op(operator.sub, val)
 
+    def __iter__(self):
+        if self.is_scalar():
+            return iter((self,))
+        return (YX(y, x) for y, x in zip(self.y, self.x))
+
     def to_int(self):
         if self.is_scalar():
             return YX(int(self.y), int(self.x))
