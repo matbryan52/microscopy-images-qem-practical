@@ -44,6 +44,89 @@ To have HyperSpy figures be interactive, add the following to a cell at the top 
 
 The objective is to carry out STEM imaging measurements (radius, area etc.) of a sample of gold nanoparticles using a simulated microscope. The simulated microscope in its default state has a drifting stage, so we cannot use the survey image to identify where to run a high-resolution scan, be cause the particle will move outside the field of view by the time we run it.
 
+## Exercises
+
+In order of increasing difficulty, with no obligation to complete all steps.
+
+For each exercise, start a new Jupyter Notebook or python script file under `TP Images/Workspace/`.
+
+> **NOTE**: Below the exercises is an explanation of how to work with the simulator and HyperSpy, [CLICK HERE](#simulator).
+
+### 1 - Detect, image and measure particles without drift
+
+Create the simulator with no drift using:
+
+```python
+from qem_practical.simulator import STEMImageSimulator
+
+simulator = STEMImageSimulator.default(drift_speed=0.)
+```
+This means we can treat the survey image as *static* and measure any particle within the field of view without distortion or tracking.
+
+- From a survey image taken at a decent dwell time (`1e-5`) locate all of the particles in the field of view using a peak-finding approach
+  - HyperSpy provides a method `signal.find_peaks()`, documented [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.find_peaks).
+  - Give the argument `interactive=False` to avoid showing the UI in the Jupyter Notebook
+  - You will need to limit the number of peaks it returns, use `min_distance=20` or more as an extra argument.
+  - The raw data for the peak positions can be found from the returned results as `peaks.data[0]`
+  - The peaks are returned as `[y, x]` positions in *pixels*.
+- For some of the detected particles run a STEM `simulator.scan()` of each and display a few of the images
+  - Remember, `simulator.scan` takes nano-metre coordinates for the centre of the scan grid. You can convert to nanometre coordinates with `simulator.survey.to_continuous((pixel_y, pixel_x))`.
+- For each detailed image use thresholding of the numpy array (`scan_image.data`) to segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity).
+  - Take a look at [`skimage.measure.regionprops`](https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops), which can operate directly on a binary `[0, 1]` image. (Use `signal.data` to get the numpy array from the HyperSpy scan image).
+  - If your thresholded image contains artefacts (small dots), either increase your threshold or consider using:
+
+  ```python
+  from skimage.morphology import remove_small_objects
+  numpy_array = remove_small_objects(numpy_array, min_size=8)  # delete regions larger than 8px in size
+  ```
+  
+  to remove these before running `regionprops`.
+  - Try to express the measurements in *nanometres* rather than pixels based on the information you have about each scan.
+- Plot the distributions of the above values as histograms (`plt.hist`).
+
+### 2 - Estimate the drift and correct an image stack
+
+Create a simulator with a random drift speed `drift_speed="random"`. The survey image will now change over time as particles move through the field of view. The drift rate will be approximately constant while the drift direction slowly changes over time.
+
+- Create a survey image with a short dwell time (`1e-6`)
+- Identify or choose an area of particles to scan in detail
+- Scan the particles repeatedly and estimate the drift vector between successive frames
+  - This can be acheived with `simulator.scan(..., stack=8)` to acquire an 8-image stack.
+  - HyperSpy provides a function `signal.estimate_shift2D()` to do this on a stack (see [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.estimate_shift2D)).
+- Plot the drift over time and compare it to the simulator's true drift curve that can accessed with:
+
+```python
+# drift_dataframe contains columns "timestamp", "yvals", "xvals" in nanometres
+timestamps = stack.axes_manager["time"].axis
+drift_dataframe = simulator.drift_for_time(timestamps)
+```
+
+- Super-impose the acquired images to correct for the drift
+  - HyperSpy provides a function `signal.align2D()` to do this on a stack (see [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.align2D)).
+- Display the summed image stack
+
+### 3 - Live drift correction
+
+If we can estimate the drift rate periodically then we can also shift the scan grid predictively in compensation - in a real microscope you might do this by adjusting *beam shift*. In the simulator we can supply a function `drift_corrector` which takes the timestamp of the scan about to start, and shifts the supplied `centre` of the scan grid by some amount. A simple function to do this would be:
+
+```python
+def predict_drift(scan_time: float) -> tuple[float, float]:
+    return (1. * scan_time, -0.3 * scan_time)
+```
+
+which would move the supplied scan `centre` coordinate by `(1, -0.3)` nm for every second since the simulator was created.
+
+Such a function would need to be created from a sequence of drift-measurement acquisitions, then applied to a new scan. The function would be less and less valid over time as the drift of the sample is not stable. The correction function would therefore need to be re-measured periodically.
+
+- Acquire a survey image and select a zone to track
+- Acquire a stack of images of the tracking region
+- Evaluate the drift as in exercise 2, then fit a function to predict it as a function of scan time
+  - The `"time"` axis of a stack acquisition is calibrated to scan time
+- Supply the `drift_corrector` function to a new stack acquisition on the same or a new area
+- Plot the results to prove the drift correction is working
+  - Sum an uncorrected stack and a corrected stack to see if the detail improves
+  - Generate a GIF of the scan images using `imageio.v3.imwrite`
+
 ## Simulator
 
 > **NOTE:** This section demonstrates some features of the simulator and HyperSpy. It is not necessary to copy all of the code into your exercise. Go to the [Exercises](#exercises) section for the practical session content.
@@ -171,79 +254,6 @@ plt.plot(x_px, y_px, "rx")  # plot some points as integer coordinates
 
 In a Jupyter notebook, there is no need to use `plt.show()`.
 
-## Exercises
-
-In order of increasing difficulty, with no obligation to complete all steps.
-
-For each exercise, start a new Jupyter Notebook or python script file under `TP Images/Workspace/`.
-
-### 1 - Detect, image and measure particles without drift
-
-Create the simulator with argument `drift_speed=0.` given to `STEMImageSimulator.default()` to disable drifting. This means we can treat the survey image as *static* and measure any particle within the field of view without distortion or tracking.
-
-- From a survey image taken at a decent dwell time (`1e-5`) locate all of the particles in the field of view using a peak-finding approach
-  - HyperSpy provides a method `signal.find_peaks()`, documented [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.find_peaks).
-  - Give the argument `interactive=False` to avoid showing the UI in the Jupyter Notebook
-  - You will need to limit the number of peaks it returns, use `min_distance=20` or more as an extra argument.
-  - The raw data for the peak positions can be found from the returned results as `peaks.data[0]`
-  - The peaks are returned as `[y, x]` positions in *pixels*.
-- For some of the detected particles run a STEM `simulator.scan()` of each and display a few of the images
-  - Remember, `simulator.scan` takes nano-metre coordinates for the centre of the scan grid. You can convert to nanometre coordinates with `simulator.survey.to_continuous((pixel_y, pixel_x))`.
-- For each detailed image use thresholding of the numpy array (`scan_image.data`) to segment the particle from the background and measure its properties (e.g. diameter, circumference, area, circularity).
-  - Take a look at [`skimage.measure.regionprops`](https://scikit-image.org/docs/stable/api/skimage.measure.html#skimage.measure.regionprops), which can operate directly on a binary `[0, 1]` image. (Use `signal.data` to get the numpy array from the HyperSpy scan image).
-  - If your thresholded image contains artefacts (small dots), either increase your threshold or consider using:
-
-  ```python
-  from skimage.morphology import remove_small_objects
-  numpy_array = remove_small_objects(numpy_array, min_size=8)  # delete regions larger than 8px in size
-  ```
-  
-  to remove these before running `regionprops`.
-  - Try to express the measurements in *nanometres* rather than pixels based on the information you have about each scan.
-- Plot the distributions of the above values as histograms (`plt.hist`).
-
-### 2 - Estimate the drift and correct an image stack
-
-Create a simulator with a random drift speed `drift_speed="random"`. The survey image will now change over time as particles move through the field of view. The drift rate will be approximately constant while the drift direction slowly changes over time.
-
-- Create a survey image with a short dwell time (`1e-6`)
-- Identify or choose an area of particles to scan in detail
-- Scan the particles repeatedly and estimate the drift vector between successive frames
-  - This can be acheived with `simulator.scan(..., stack=8)` to acquire an 8-image stack.
-  - HyperSpy provides a function `signal.estimate_shift2D()` to do this on a stack (see [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.estimate_shift2D)).
-- Plot the drift over time and compare it to the simulator's true drift curve that can accessed with:
-
-```python
-# drift_dataframe contains columns "timestamp", "yvals", "xvals" in nanometres
-timestamps = stack.axes_manager["time"].axis
-drift_dataframe = simulator.drift_for_time(timestamps)
-```
-
-- Super-impose the acquired images to correct for the drift
-  - HyperSpy provides a function `signal.align2D()` to do this on a stack (see [here](https://hyperspy.org/hyperspy-doc/current/reference/api.signals/Signal2D.html#hyperspy.api.signals.Signal2D.align2D)).
-- Display the summed image stack
-
-### 3 - Live drift correction
-
-If we can estimate the drift rate periodically then we can also shift the scan grid predictively in compensation - in a real microscope you might do this by adjusting *beam shift*. In the simulator we can supply a function `drift_corrector` which takes the timestamp of the scan about to start, and shifts the supplied `centre` of the scan grid by some amount. A simple function to do this would be:
-
-```python
-def predict_drift(scan_time: float) -> tuple[float, float]:
-    return (1. * scan_time, -0.3 * scan_time)
-```
-
-which would move the supplied scan `centre` coordinate by `(1, -0.3)` nm for every second since the simulator was created.
-
-Such a function would need to be created from a sequence of drift-measurement acquisitions, then applied to a new scan. The function would be less and less valid over time as the drift of the sample is not stable. The correction function would therefore need to be re-measured periodically.
-
-- Acquire a survey image and select a zone to track
-- Acquire a stack of images of the tracking region
-- Evaluate the drift as in exercise 2, then fit a function to predict it as a function of scan time
-  - The `"time"` axis of a stack acquisition is calibrated to scan time
-- Supply the `drift_corrector` function to a new stack acquisition on the same or a new area
-- Plot the results to prove the drift correction is working
-  - Sum an uncorrected stack and a corrected stack to see if the detail improves
-  - Generate a GIF of the scan images using `imageio.v3.imwrite`
 
 ### Extension: Kalman Filter
 
