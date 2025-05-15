@@ -4,13 +4,25 @@ Describes the practical session for QEM2025 related to image processing using Hy
 
 ## Setup
 
-### Juypter interactive figures
+### Installation
 
-To have HyperSpy figures be interactive, add the following to a cell at the top of your notebook and run it:
+It is recommended to use a virtual environment to install this (or any) package.
 
-```python
-%matplotlib widget
+The base package just installs the simulator itself, without GUI dependencies.
+
+```powershell
+pip install "qem_practical @ https://github.com/matbryan52/microscopy-images-qem-practical/archive/refs/heads/master.zip"
 ```
+
+To add the GUI dependencies, and Jupyter Lab (for notebooks):
+
+```powershell
+pip install "qem_practical[gui,notebook] @ https://github.com/matbryan52/microscopy-images-qem-practical/archive/refs/heads/master.zip"
+```
+
+### Data
+
+The simulator data will automatically download on first use or after a long time, so you must have an internet connection at this time.
 
 ## Objective
 
@@ -105,6 +117,16 @@ Such a function would need to be created from a sequence of drift-measurement ac
 6. Based on the new stack, **update** your drift correction function with the new images
   - The centre points of each image in the stack are at `image.metadata.corrected_centre`
   - The correction value applied for each image is at `image.metadata.correction`.
+
+### Extensions
+
+#### Kalman Filter
+
+A Kalman filter is a statistical technique to estimate both the tendency and noise in a time-series of measurements. It is often used in motion tracking and prediction tools, for example in GPS software. Try to implement a Kalman filter to smooth and better-predict the drift of the sample.
+
+#### GPU Implementation
+
+Look into the `cupy` Python library and see if you can write the Python code to do drift estimation using the GPU.
 
 ## Simulator examples
 
@@ -240,7 +262,9 @@ survey_image.isig[12.3:24.9, 38.2:45.1]  # x0->x1, y0->y1 ranges in nanometres!
 
 > **NOTE:** The slice values **must be floating point** i.e. `4.` not `4`, else they will be interpreted as pixel values and not nano-metres.
 
-We can also plot our signals using HyperSpy, and use `matplotlib` to add additional annotations:
+Any HyperSpy signal has an underlying `numpy` array underneath which can be accessed using `signal.data`, for cases where HyperSpy does not provide a processing method that you would like to use.
+
+We can also plot our signals using HyperSpy, and then `matplotlib` to add additional annotations:
 
 ```python
 %matplotlib widget
@@ -255,12 +279,28 @@ plt.plot(xcoord, ycoord, 'rx')  # x and y coords must be in nanometres as HyperS
 
 > **NOTE:** HyperSpy displays coordinates in the plot window as `(x, y)` in nanometres, but numpy arrays are indexed `[y, x]` in pixels!
 
-Any HyperSpy signal has an underlying `numpy` array underneath which can be accessed using `signal.data`, if HyperSpy does not provide a processing method that you would like to use.
+### Juypter interactive figures
 
-## Extension: Kalman Filter
+To have HyperSpy figures be interactive, add the following to a cell at the top of your notebook and run it:
 
-A Kalman filter is a statistical technique to estimate both the tendency and noise in a time-series of measurements. It is often used in motion tracking and prediction tools, for example in GPS software. Try to implement a Kalman filter to smooth and better-predict the drift of the sample.
+```python
+%matplotlib widget
+```
 
-## GPU Implementation
+## Data format
 
-Look into the `cupy` Python library and see if you can write the Python code to do drift estimation using the GPU.
+The data have the form of a compressed numpy `.npz` archive containing two objects:
+
+```
+archive["data"]  # the numpy array of the image
+archive["extent"]  # a tuple `(y, x) in nanometres for the extent of the date (defines the scale of the coordinate system)
+```
+
+The shape of the survey image as well as fraction of the extent of the data that the survey image covers is set in:
+
+```python
+qem_practical.simulator.SURVEY_FRACTION = 0.8
+qem_practical.simulator.SURVEY_SHAPE = 512, 512
+```
+
+The data files are stored in the user temporary folder under `<temp>/qem_practical/`.

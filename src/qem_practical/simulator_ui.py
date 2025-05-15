@@ -13,6 +13,7 @@ pn.extension("floatpanel")
 
 from libertem_ui.figure import ApertureFigure, set_frame_height
 from libertem_ui.display.display_base import Rectangles, Curve, PointSet
+
 from .simulator import STEMImageSimulator, YX
 
 MAXDIM = 512

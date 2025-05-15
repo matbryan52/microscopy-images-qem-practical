@@ -27,6 +27,9 @@ PicoAmps: TypeAlias = float
 ELECTRON_PER_PA = 1e-12 * (1 / constants.e)
 DRIFT_HISTORY = 60 * 10
 
+SURVEY_FRACTION = 0.8
+SURVEY_SHAPE = 512, 512
+
 SCAN_WAIT = True
 SCAN_DEAD_TIME = 0.2
 SCAN_WARN_TIME = 15.
@@ -212,11 +215,11 @@ class STEMImageSimulator:
         )
         self._rng = np.random.default_rng()
 
-        survey_fraction = 0.8
+        survey_fraction = SURVEY_FRACTION
         self._survey_def = ScanDef(
             tl = self._extent * ((1 - survey_fraction) / 2),
             extent = self._extent * survey_fraction,
-            shape=YX(512, 512),
+            shape=YX(*SURVEY_SHAPE),
         )
         self._current = current
         self._true_defocus = defocus
@@ -667,7 +670,13 @@ class STEMImageSimulator:
         """
         Launch the GUI webapp for this simulator
         """
-        from .simulator_ui import simulator_ui
+        try:
+            from .simulator_ui import simulator_ui
+        except (ModuleNotFoundError, ImportError):
+            raise ImportError(
+                "Need to install this package with the [gui] optional "
+                "dependencies in order to use the GUI simulator."
+            )
         simulator_ui(self).show(
             title="STEM Image Simulator",
             open=True,
