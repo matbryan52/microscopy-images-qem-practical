@@ -1,4 +1,3 @@
-import pathlib
 import time
 import operator
 from threading import Lock
@@ -10,10 +9,10 @@ import tqdm.auto as tqdm
 import pandas as pd
 from scipy.interpolate import RegularGridInterpolator
 import pint
-import hyperspy.api as hs
 from hyperspy._signals.signal2d import Signal2D
 from hyperspy.axes import UniformDataAxis, DataAxis
 
+from . import DATA_PATH, download_data
 from .bezier_curve import generate_curve, QuadBezier
 
 
@@ -239,10 +238,14 @@ class STEMImageSimulator:
         defocus: NanoMetres = 0.,
     ) -> 'STEMImageSimulator':
         """
-        Create a :class:`STEMImageSimulator` with the default nanoparticle data
+        Create a :class:`STEMImageSimulator` with the
+        default nanoparticle data
         """
-        rootdir = pathlib.Path(__file__).parent.parent.parent
-        sim_data = np.load(rootdir / "data" / "particles.npz")
+        try:
+            sim_data = np.load(DATA_PATH)
+        except FileNotFoundError:
+            download_data()
+            sim_data = np.load(DATA_PATH)
         return cls(
             **sim_data,
             current=current,
